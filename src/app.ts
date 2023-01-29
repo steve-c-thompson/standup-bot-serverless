@@ -1,4 +1,4 @@
-import {App, AwsLambdaReceiver} from '@slack/bolt';
+import {App, AwsLambdaReceiver, LogLevel} from '@slack/bolt';
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
@@ -9,6 +9,8 @@ const dataSource = new AwsSecretsDataSource(context.secretsManager);
 
 let awsLambdaReceiver: AwsLambdaReceiver;
 
+const logLevel = LogLevel.INFO;
+
 const init = async () => {
     logger.debug("Executing async init");
     const signingSecret = await dataSource.slackSigningSecret();
@@ -18,12 +20,12 @@ const init = async () => {
 
     awsLambdaReceiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
-        // logLevel: LogLevel.DEBUG
+        logLevel: logLevel
     });
     app = new App({
         token: slackBotToken,
         receiver: awsLambdaReceiver,
-        // logLevel: LogLevel.DEBUG,
+        logLevel: logLevel
     });
 
     app.command("/standup", async ({ ack, body, client, logger  }) => {
@@ -56,8 +58,10 @@ const init = async () => {
         }
     });
 
-    app.view('view_1', async ({ ack, body, view, client, logger }) => {
+    app.view("standup_view", async ({ ack, body, view, client, logger }) => {
         await ack();
+
+        logger.debug("Handling standup-view submit");
 
         let chatPostMessageArguments = await slackBot.createChatMessageFromViewOutput(view, client, logger);
         try {

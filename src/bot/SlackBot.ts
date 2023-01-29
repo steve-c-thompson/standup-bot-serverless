@@ -1,9 +1,7 @@
 import {Logger, Option, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
-import {promptsList} from "./PromptsList";
 
 export class SlackBot {
-    readonly MESSAGE_TITLE_DEFAULT = "Randomly selected members";
 
     /**
      * Create the initial modal view. block_id and action_id are hardcoded.
@@ -14,18 +12,7 @@ export class SlackBot {
     public async openModalView(body: SlashCommand, client: WebClient, logger: Logger): Promise<ViewsOpenArguments> {
         const channelId = body.channel_id;
 
-        let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
-
-        let title = body.text ? body.text : "";
-
-        const checkboxOption: Option = {
-            text: {
-                text: 'Number user list \n `1. User 1` \n `2. User 2`',
-                type: 'mrkdwn',
-
-            },
-            value: 'yes',
-        };
+       // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
 
         const pm: PrivateMetadata = {
           channelId: channelId,
@@ -38,156 +25,78 @@ export class SlackBot {
             view: {
                 type: 'modal',
                 // View identifier
-                callback_id: 'view_1',
+                callback_id: 'standup_view',
                 clear_on_close: true,
                 // Save the channel ID and user ID for subsequent interactions
                 private_metadata: JSON.stringify(pm),
                 title: {
                     type: 'plain_text',
-                    text: 'Rando'
+                    text: 'Standup Status'
                 },
                 blocks: [
                     {
-                        type: 'section',
-                        text: {
-                            type: 'mrkdwn',
-                            text: 'Select team members to randomize. This will output a list in the channel. You can choose to `@` members.'
+                        type: "input",
+                        block_id : "yesterday",
+                        element: {
+                            type: "plain_text_input",
+                            multiline: true,
+                            action_id: "yesterday-action",
+                            focus_on_load: true,
+                        },
+                        label: {
+                            type: "plain_text",
+                            text: "Yesterday",
+                            emoji: true
                         }
                     },
                     {
-                        type: 'input',
-                        optional: true,
-                        label: {
-                            type: 'plain_text',
-                            text: 'Prompt to precede the title'
-                        },
-                        block_id: 'prompt_select',
+                        type: "input",
+                        block_id : "today",
                         element: {
-                            type: 'static_select',
-                            action_id: 'prompt_select_val',
-                            placeholder: {
-                                type: 'plain_text',
-                                text: 'Optionally select a common prompt'
-                            },
-                            options: [
-                                {
-                                    text: {
-                                        text: promptsList.get('0')!.displayText,
-                                        type: 'plain_text'
-                                    },
-                                    value: '0'
-                                },
-                                {
-                                    text: {
-                                        text: promptsList.get('1')!.displayText,
-                                        type: 'plain_text'
-                                    },
-                                    value: '1'
-                                }
-
-                            ]
+                            type: "plain_text_input",
+                            multiline: true,
+                            action_id: "today-action"
                         },
-                    },
-                    {
-                        type: 'input',
-                        block_id: 'title',
-                        optional: true,
                         label: {
-                            type: 'plain_text',
-                            text: 'Title'
-                        },
-                        element: {
-                            type: 'plain_text_input',
-                            action_id: 'title_value',
-                            initial_value: title,
-                            focus_on_load: true
+                            type: "plain_text",
+                            text: "Today",
+                            emoji: true
                         }
                     },
                     {
-                        type: 'input',
-                        block_id: 'team_members',
-                        label: {
-                            type: 'plain_text',
-                            text: 'Select Team Members'
-                        },
+                        type: "input",
+                        block_id : "parking-lot",
+                        optional : true,
                         element: {
-                            action_id: 'member_list',
-                            type: 'multi_users_select',
-                            initial_users: memberIds,
-                            placeholder: {
-                                type: 'plain_text',
-                                text: 'Select Teammates'
-                            }
+                            type: "plain_text_input",
+                            multiline: true,
+                            action_id: "parking-lot-action"
                         },
+                        label: {
+                            type: "plain_text",
+                            text: "Parking Lot Items",
+                            emoji: true
+                        }
                     },
                     {
-                        type: 'input',
-                        dispatch_action: false,
+                        type: "input",
                         optional: true,
-                        label: {
-                            type: 'plain_text',
-                            text: 'Message Formatting'
-                        },
-                        block_id: 'order_list',
+                        block_id : "parking-lot-participants",
                         element: {
-                            type: 'checkboxes',
-                            action_id: 'order_list_val',
-                            options: [
-                                checkboxOption
-                            ],
-                            initial_options: [
-                                checkboxOption
-                            ]
-
-                        },
-                    },
-                    {
-                        type: 'input',
-                        optional: true,
-                        label: {
-                            type: 'plain_text',
-                            text: 'Number of users to notify'
-                        },
-                        block_id: 'at_users',
-                        element: {
-                            type: 'static_select',
-                            action_id: 'at_users_val',
+                            type: "multi_users_select",
                             placeholder: {
-                                type: 'plain_text',
-                                text: 'Optionally select a number'
+                                type: "plain_text",
+                                text: "Select teammates",
+                                emoji: true
                             },
-                            options: [
-                                {
-                                    text: {
-                                        text: '1',
-                                        type: 'plain_text'
-                                    },
-                                    value: '1'
-                                },
-                                {
-                                    text: {
-                                        text: '2',
-                                        type: 'plain_text'
-                                    },
-                                    value: '2'
-                                },
-                                {
-                                    text: {
-                                        text: '3',
-                                        type: 'plain_text'
-                                    },
-                                    value: '3'
-                                },
-                                {
-                                    text: {
-                                        text: 'All',
-                                        type: 'plain_text'
-                                    },
-                                    value: 'all'
-                                }
-                            ]
+                            action_id: "parking-lot-participants-action"
                         },
-                    },
+                        label: {
+                            type: "plain_text",
+                            text: "Parking Lot Participants",
+                            emoji: true
+                        }
+                    }
                 ],
                 submit: {
                     type: 'plain_text',
@@ -216,55 +125,150 @@ export class SlackBot {
     }
 
     public async createChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
-        const prompt = view['state']['values']['prompt_select']['prompt_select_val'].selected_option?.value;
-        let titleVal = view['state']['values']['title']['title_value'].value;
-
-        let title = '';
-        if (prompt) {
-            title += promptsList.get(prompt)!.messageText;
-        }
-        if (titleVal) {
-            title += titleVal;
-        } else if (!prompt) {
-            // if there is no titleVal or prompt, output default
-            title = this.MESSAGE_TITLE_DEFAULT;
-        }
         // channel_id and maybe user_id stored from submit
         let pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
         const channelId = pm.channelId!;
-        const userId = pm.userId;
+        const userId = pm.userId!;
 
-        const orderListVal = view['state']['values']['order_list']['order_list_val'].selected_options?.length;
+        const userInfo = await this.queryUser(userId, client);
 
-        const numToAtVal = view['state']['values']['at_users']['at_users_val'].selected_option?.value;
+        let userInfoMsg = userInfo.user?.real_name + " - Status";
 
-        const numToAt: number = numToAtVal == "all" ? 999 :
-            !numToAtVal ? 0 : parseInt(numToAtVal!);
+        // Yesterday
+        const yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
+        // Today
+        const today = view['state']['values']['today']['today-action'].value!;
+        // Parking Lot
+        const parkingLot = view['state']['values']['parking-lot']['parking-lot-action'].value;
 
+        // Parking Lot Attendees
         // Get list of selected members
-        let selectedMemberIds = view['state']['values']['team_members']['member_list'];
-        let memberOutput = "";
+        let selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
-        try {
-            const memberInfos = await this.querySelectedMembers(selectedMemberIds.selected_users!, client);
-
-            memberOutput = this.formatMembersForOutput(memberInfos, !!orderListVal, numToAt);
-        } catch (e) {
-            logger.error(e);
-        }
-
-        let msg = title + '\n' + memberOutput;
-        return {channel: channelId, text: msg, mrkdwn: true};
+        let blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, selectedMemberIds.selected_users!, client, logger);
+        // post as the user who requested
+        return {
+            channel: channelId,
+            username: userInfo.user?.real_name,
+            icon_url: userInfo.user?.profile?.image_72,
+            blocks: blocks,
+            text: userInfoMsg,
+            mrkdwn: true
+        };
     }
 
-    private async querySelectedMembers(selectedMemberIds: string[], client: WebClient) {
-        const memberInfosProm = selectedMemberIds?.map(m => {
-            return client.users.info({
-                user: m
-            });
+    private buildOutputMsg(yesterday: string, today: string, parkingLotItems: string | null | undefined, parkingLotAttendees: string) {
+        let output = "*Yesterday*\n" + yesterday + "\n"
+            + "*Today*\n" + today + "\n";
+        if(parkingLotItems) {
+            output += "*Parking Lot Items* \n" +parkingLotItems + "\n"
+        }
+        if(parkingLotAttendees.length > 0){
+            output += "*Parking Lot Attendees*\n" + parkingLotAttendees + "\n";
+        }
+        return output;
+    }
+
+    private async buildOutputBlocks(userInfoMsg: string,
+                                    yesterday: string, today: string,
+                              parkingLotItems: string | null | undefined,
+                              parkingLotAttendees: string[],
+                              client: WebClient,
+                              logger: Logger) {
+        let blocks = [
+            {
+              type: "header",
+              text: {
+                  type: "plain_text",
+                  text: userInfoMsg,
+                  emoji: true
+              }
+            },
+            {
+                type: "section",
+                text: {
+                    type: "mrkdwn",
+                    text: ":rewind: *Yesterday*\n" + yesterday
+                }
+            },
+            {
+                type: "divider"
+            },
+            {
+                type: "section",
+                text: {
+                    type: "mrkdwn",
+                    text: ":arrow_forward: *Today*\n" + today
+                }
+            },
+            {
+                type: "divider"
+            },
+        ];
+
+        if(parkingLotItems) {
+            blocks.push(
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: ":car: *Parking Lot Items*\n" + parkingLotItems
+                    }
+                },
+                {
+                    type: "divider"
+                },
+            );
+        }
+        if(parkingLotAttendees.length > 0) {
+            try {
+                const memberInfos = await this.queryUsers(parkingLotAttendees, client);
+                // Text output
+                let memberOutput = this.formatMembersForOutput(memberInfos);
+                let context = {
+                    type: "context",
+                    elements: new Array()
+                };
+                memberInfos.forEach(m => {
+                   context.elements.push(
+                       {
+                           type: "image",
+                           image_url: m.user?.profile?.image_72,
+                           alt_text: m.user?.real_name
+                       }
+                   );
+                });
+
+                blocks.push({
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
+                    }
+                    },
+                    context
+                    );
+
+            } catch (e) {
+                logger.error(e);
+            }
+        }
+
+        return blocks;
+    }
+
+    private async queryUsers(users: string[], client: WebClient) {
+        const memberInfosProm = users?.map(m => {
+            return this.queryUser(m, client);
         });
 
         return await Promise.all(memberInfosProm!);
+    }
+
+    private async queryUser(user: string, client: WebClient) {
+        return client.users.info({
+            user: user
+        });
     }
 
     /**
@@ -274,7 +278,7 @@ export class SlackBot {
      */
     private async filterMembersListForRemoved(membersList: string[], client: WebClient, logger: Logger): Promise<string[]> {
         try {
-            let members = await this.querySelectedMembers(membersList, client);
+            let members = await this.queryUsers(membersList, client);
             membersList = members.filter(m => {
                 return !m.user?.deleted;
             }).map(u => {
@@ -333,25 +337,17 @@ export class SlackBot {
     }
 
     /**
-     *
+     * Use each UsersInfoResponse to output an image and name
      * @param memberInfos
-     * @param numberListItems true if we number the list
-     * @param numToAt the number of users to @
      * @private
      */
-    private formatMembersForOutput(memberInfos: UsersInfoResponse[], numberListItems: boolean, numToAt = 0): string {
+    private formatMembersForOutput(memberInfos: UsersInfoResponse[]): string {
         let formatted = "";
         memberInfos.forEach((m, index) => {
-            if (numberListItems) {
-                formatted += (index + 1) + ". ";
-            }
-            if (index < numToAt) {
-                formatted += "<@" + m.user?.id + ">";
-            } else {
-                formatted += m.user?.real_name
-            }
-            formatted += "\n";
+            formatted += "<@" + m.user?.id + "> ";
+
         });
+        formatted += "\n";
 
         return formatted.toString();
     }
