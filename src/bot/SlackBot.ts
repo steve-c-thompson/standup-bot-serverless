@@ -1,4 +1,4 @@
-import {Logger, Option, SlashCommand, ViewOutput} from "@slack/bolt";
+import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
 
 export class SlackBot {
@@ -9,7 +9,7 @@ export class SlackBot {
      * @param client
      * @param logger
      */
-    public async openModalView(body: SlashCommand, client: WebClient, logger: Logger): Promise<ViewsOpenArguments> {
+    public async buildModalView(body: SlashCommand, client: WebClient, logger: Logger): Promise<ViewsOpenArguments> {
         const channelId = body.channel_id;
 
        // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
@@ -175,14 +175,14 @@ export class SlackBot {
                               parkingLotAttendees: string[],
                               client: WebClient,
                               logger: Logger) {
-        let blocks = [
+        let blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
             {
-              type: "header",
-              text: {
-                  type: "plain_text",
-                  text: userInfoMsg,
-                  emoji: true
-              }
+                type: "header",
+                text: {
+                    type: "plain_text",
+                    text: userInfoMsg,
+                    emoji: true
+                }
             },
             {
                 type: "section",
@@ -192,21 +192,15 @@ export class SlackBot {
                 }
             },
             {
-                type: "divider"
-            },
-            {
                 type: "section",
                 text: {
                     type: "mrkdwn",
                     text: ":arrow_forward: *Today*\n" + today
                 }
-            },
-            {
-                type: "divider"
-            },
+            }
         ];
 
-        if(parkingLotItems) {
+        if (parkingLotItems) {
             blocks.push(
                 {
                     type: "section",
@@ -214,45 +208,52 @@ export class SlackBot {
                         type: "mrkdwn",
                         text: ":car: *Parking Lot Items*\n" + parkingLotItems
                     }
-                },
-                {
-                    type: "divider"
-                },
+                }
             );
         }
-        if(parkingLotAttendees.length > 0) {
+        if (parkingLotAttendees.length > 0) {
             try {
                 const memberInfos = await this.queryUsers(parkingLotAttendees, client);
                 // Text output
                 let memberOutput = this.formatMembersForOutput(memberInfos);
-                let context = {
+                let context: ContextBlock = {
                     type: "context",
-                    elements: new Array()
+                    elements: []
                 };
                 memberInfos.forEach(m => {
-                   context.elements.push(
-                       {
-                           type: "image",
-                           image_url: m.user?.profile?.image_72,
-                           alt_text: m.user?.real_name
-                       }
-                   );
+                    context.elements.push(
+                        {
+                            type: "image",
+                            image_url: m.user!.profile!.image_72!,
+                            alt_text: m.user!.real_name!
+                        }
+                    );
                 });
 
                 blocks.push({
-                    type: "section",
-                    text: {
-                        type: "mrkdwn",
-                        text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
-                    }
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
+                        }
                     },
                     context
-                    );
+                );
 
             } catch (e) {
                 logger.error(e);
             }
         }
+
+        // Add disclaimer
+        blocks.push({
+            type: "context",
+            elements: [{
+                type: "mrkdwn",
+                text: "You cannot edit this post. Add any updates in its thread :thread:"
+            }]
+        } );
+
 
         return blocks;
     }

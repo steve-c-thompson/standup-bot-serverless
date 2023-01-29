@@ -1,4 +1,4 @@
-import {App, AwsLambdaReceiver, LogLevel} from '@slack/bolt';
+import {App, AwsLambdaReceiver, LogLevel, ModalView} from '@slack/bolt';
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
@@ -47,7 +47,7 @@ const init = async () => {
         }
         else {
             try {
-                let payload = await slackBot.openModalView(body, client, logger);
+                let payload = await slackBot.buildModalView(body, client, logger);
                 const result = await client.views.open(
                     payload
                 );
@@ -59,18 +59,52 @@ const init = async () => {
     });
 
     app.view("standup_view", async ({ ack, body, view, client, logger }) => {
-        await ack();
-
         logger.debug("Handling standup-view submit");
 
         let chatPostMessageArguments = await slackBot.createChatMessageFromViewOutput(view, client, logger);
-        try {
-            await client.chat.postMessage (chatPostMessageArguments);
+       try {
+           await client.chat.postMessage (chatPostMessageArguments);
+           await ack();
+       }
+       catch (error) {
+           logger.error(error);
+           let msg = (error as Error).message;
+           if(msg.includes("not_in_channel")){
+               msg = ":x: Standup is a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
+                   "`@Standup`."
+           }
+           const viewArgs: ModalView = {
+                     type: 'modal',
+                     callback_id: 'standup_view',
+                     title: {
+                         type: 'plain_text',
+                         text: 'Standup Error'
+                     },
+                     close: {
+                         type: "plain_text",
+                         text: "Close",
+                     },
+                     blocks: [
+                         {
+                             type: "section",
+                             text: {
+                                 type: "mrkdwn",
+                                 text: msg
+                             }
+                         }
+                     ]
+                 };
+            try {
+                logger.info(viewArgs);
+                await ack({
+                    response_action: "update",
+                    view: viewArgs
+                }
+                );
+            } catch (e) {
+                logger.error("Secondary error", e);
+            }
         }
-        catch (error) {
-            logger.error(error);
-        }
-
     });
 
     return await awsLambdaReceiver.start();
