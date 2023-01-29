@@ -21,8 +21,19 @@
       "pre-commit": "pretty-quick --staged"
     }
   },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "plugin:@typescript-eslint/recommended"
+    ]
+  },
   "devDependencies": {
     "@types/node": "^18.11.18",
+    "@typescript-eslint/eslint-plugin": "^5.49.0",
+    "@typescript-eslint/parser": "^5.49.0",
     "aws-sdk": "^2.1304.0",
     "husky": "^8.0.3",
     "prettier": "^2.8.3",
