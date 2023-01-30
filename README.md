@@ -15,11 +15,11 @@ Add bot to channels where you wish to use it.
 
 ## Usage - Slack
 ```sh
-/rando [title]
+/standup [title]
 ```
 
 ## Deployment
-SLS makes it easy to deploy to AWS
+[SLS](https://www.serverless.com/) makes it easy to deploy to AWS
 ```
 sls deploy --stage (prod | dev) [--aws-profile profile-name] [--region us-east-2]
 ```
