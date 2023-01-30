@@ -28,7 +28,11 @@
     ],
     "extends": [
       "plugin:@typescript-eslint/recommended"
-    ]
+    ],
+    "rules" : {
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-var-requires": "off"
+    }
   },
   "devDependencies": {
     "@types/node": "^18.11.18",

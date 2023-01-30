@@ -2,7 +2,7 @@ import * as AWS from "aws-sdk";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
 import winston, {createLogger} from "winston";
 
-export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-test";
+export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
 
 export const logger = createLogger( {
     level: 'info',
@@ -31,7 +31,7 @@ function createDevContext(): Context {
     logger.info("Creating context for dev");
     return {
         secretsManager: new SecretsManager({}),
-        secretName: "SlackStandup-secret-test",
+        secretName: "SlackStandup-secret-dev",
     };
 }
 
@@ -62,7 +62,7 @@ function createLocalContext(): Context {
             },
             region: AWS.config.region,
         }),
-        secretName: "SlackStandup-secret-test"
+        secretName: "SlackStandup-secret-dev"
     };
 }
 

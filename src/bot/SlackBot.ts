@@ -31,7 +31,7 @@ export class SlackBot {
                 private_metadata: JSON.stringify(pm),
                 title: {
                     type: 'plain_text',
-                    text: 'Standup Status'
+                    text: 'Async Standup Status'
                 },
                 blocks: [
                     {
@@ -126,13 +126,13 @@ export class SlackBot {
 
     public async createChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
         // channel_id and maybe user_id stored from submit
-        let pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
+        const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
         const channelId = pm.channelId!;
         const userId = pm.userId!;
 
         const userInfo = await this.queryUser(userId, client);
 
-        let userInfoMsg = userInfo.user?.real_name + " - Status";
+        const userInfoMsg = userInfo.user?.real_name + " - standup status";
 
         // Yesterday
         const yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
@@ -143,9 +143,9 @@ export class SlackBot {
 
         // Parking Lot Attendees
         // Get list of selected members
-        let selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
+        const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
-        let blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, selectedMemberIds.selected_users!, client, logger);
+        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, selectedMemberIds.selected_users!, client, logger);
         // post as the user who requested
         return {
             channel: channelId,
@@ -175,7 +175,7 @@ export class SlackBot {
                               parkingLotAttendees: string[],
                               client: WebClient,
                               logger: Logger) {
-        let blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
+        const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
             {
                 type: "header",
                 text: {
@@ -215,8 +215,8 @@ export class SlackBot {
             try {
                 const memberInfos = await this.queryUsers(parkingLotAttendees, client);
                 // Text output
-                let memberOutput = this.formatMembersForOutput(memberInfos);
-                let context: ContextBlock = {
+                const memberOutput = this.formatMembersForOutput(memberInfos);
+                const context: ContextBlock = {
                     type: "context",
                     elements: []
                 };
@@ -279,7 +279,7 @@ export class SlackBot {
      */
     private async filterMembersListForRemoved(membersList: string[], client: WebClient, logger: Logger): Promise<string[]> {
         try {
-            let members = await this.queryUsers(membersList, client);
+            const members = await this.queryUsers(membersList, client);
             membersList = members.filter(m => {
                 return !m.user?.deleted;
             }).map(u => {
@@ -302,20 +302,19 @@ export class SlackBot {
         let memString;
         try {
             // get members of the channel
-            let members;
-            members = await client.conversations.members({
+            const members = await client.conversations.members({
                 channel: body.channel_id
             });
 
             memString = members.members;
 
             // filter bots
-            let allMembers = await SlackBot.getAllMembers(client);
+            const allMembers = await SlackBot.getAllMembers(client);
 
             if (allMembers) {
-                let allBots = allMembers.filter(m => m.is_bot);
+                const allBots = allMembers.filter(m => m.is_bot);
                 if (allBots) {
-                    let allBotIds = allBots.map(m => m.id)
+                    const allBotIds = allBots.map(m => m.id)
                     if (allBots && memString) {
                         memString = memString.filter(m => !allBotIds.includes(m));
                     }
@@ -333,7 +332,7 @@ export class SlackBot {
      * @private
      */
     private static async getAllMembers(client: WebClient) {
-        let allMembers = await client.users.list();
+        const allMembers = await client.users.list();
         return allMembers.members;
     }
 
