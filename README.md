@@ -20,6 +20,13 @@ Add bot to channels where you wish to use it.
 
 ## Deployment
 [SLS](https://www.serverless.com/) makes it easy to deploy to AWS
+
+Install with the command
+
+```
+npm install -g serverless
+```
+
 ```
 sls deploy --stage (prod | dev) [--aws-profile profile-name] [--region us-east-2]
 ```
@@ -29,13 +36,13 @@ To inspect the size and content of the deployment without deploying anything to 
 sls package --stage (prod | dev) [--aws-profile profile-name]
 ```
 
-You can also check configuration substitutions
+You can also check configuration substitutions. This is useful for checking things like the target `region`.
 ```
 sls print --stage (prod | dev)
 ```
 
 ### Secrets
-Create a secret in SecretsManager named `SlackStandup-secret-prod` with the values
+Create a secret in SecretsManager named `SlackStandup-secret-dev` or `SlackStandup-secret-prod`, depending on the target environment, with the values
 
 * `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
