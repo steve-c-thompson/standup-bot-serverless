@@ -15,7 +15,9 @@ Add bot to channels where you wish to use it.
 
 ## Usage - Slack
 ```sh
-/standup [title]
+/standup help
+/standup [parking-lot | parking_lot | parkinglot | -p]- display ephemeral parking lot items
+/standup post [parking-lot | parking_lot | parkinglot | -p] - post parking lot items to chat
 ```
 
 ## Deployment

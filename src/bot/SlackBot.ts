@@ -96,7 +96,7 @@ export class SlackBot {
                             placeholder: {
                                 type: "plain_text",
                                 text: "Select teammates",
-                                emoji: true
+                                emoji: true,
                             },
                             action_id: "parking-lot-participants-action"
                         },
@@ -117,7 +117,7 @@ export class SlackBot {
     }
 
     /**
-     * Get either the memberIds that were previously saved, or members of the channel
+     * Get either the memberIds that are members of the channel
      * @param channelId
      * @param logger
      * @param client
@@ -193,7 +193,10 @@ export class SlackBot {
         if (p) {
             let proms = await p.parkingLotData!.map(async i => {
                 let u = await this.queryUser(i.userId, client);
-                return u.user?.real_name + " | " + i.content + " | " + i.attendees!.join(", ");
+                let attendeeList = i.attendees!.map(a => {
+                    return this.atMember(a);
+                }).join(", ");
+                return "*" + u.user?.real_name + "*\n" + i.content + "\n*Attendees*: " + attendeeList;
             }).flat();
             let out = await Promise.all(proms);
             return out.join("\n");
@@ -210,7 +213,7 @@ export class SlackBot {
             let plNames: string[] = [];
             if (parkingLotAttendees.length > 0) {
                 plNames = parkingLotAttendees.map((m) => {
-                    return m.user?.real_name!
+                    return m.user?.id!
                 });
             }
             // check if this object already exists
@@ -287,7 +290,7 @@ export class SlackBot {
         if (parkingLotAttendees.length > 0) {
             try {
                 // Text output
-                const memberOutput = this.formatMembersForOutput(parkingLotAttendees);
+                const memberOutput = this.formatMembersForOutput(parkingLotAttendees, " ") + "\n";
                 const context: ContextBlock = {
                     type: "context",
                     elements: []
@@ -411,16 +414,19 @@ export class SlackBot {
     /**
      * Use each UsersInfoResponse to output an image and name
      * @param memberInfos
+     * @param divider
      * @private
      */
-    private formatMembersForOutput(memberInfos: UsersInfoResponse[]): string {
+    private formatMembersForOutput(memberInfos: UsersInfoResponse[], divider: string): string {
         let formatted = "";
         memberInfos.forEach((m, index) => {
-            formatted += "<@" + m.user?.id + "> ";
-
+            formatted += this.atMember(m.user?.id!) + divider;
         });
-        formatted += "\n";
 
         return formatted.toString();
+    }
+
+    private atMember(id: string) {
+        return "<@" + id + ">";
     }
 }
