@@ -51,6 +51,10 @@ export class SlackBot {
                             multiline: true,
                             action_id: "yesterday-action",
                             focus_on_load: true,
+                            placeholder: {
+                                type: "plain_text",
+                                text: "What you did yesterday"
+                            }
                         },
                         label: {
                             type: "plain_text",
@@ -64,7 +68,11 @@ export class SlackBot {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "today-action"
+                            action_id: "today-action",
+                            placeholder: {
+                                type: "plain_text",
+                                text: "What you will do today"
+                            }
                         },
                         label: {
                             type: "plain_text",
@@ -79,7 +87,11 @@ export class SlackBot {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "parking-lot-action"
+                            action_id: "parking-lot-action",
+                            placeholder: {
+                                type: "plain_text",
+                                text: "Parking Lot items to discuss"
+                            }
                         },
                         label: {
                             type: "plain_text",
@@ -105,7 +117,26 @@ export class SlackBot {
                             text: "Parking Lot Participants",
                             emoji: true
                         }
-                    }
+                    },
+                    {
+                        type: "input",
+                        block_id: "pull-requests",
+                        optional: true,
+                        element: {
+                            type: "plain_text_input",
+                            multiline: true,
+                            action_id: "pull-requests-action",
+                            placeholder: {
+                                type: "plain_text",
+                                text: "PRs you need reviewed"
+                            }
+                        },
+                        label: {
+                            type: "plain_text",
+                            text: "Pull Requests for Review",
+                            emoji: true
+                        }
+                    },
                 ],
                 submit: {
                     type: 'plain_text',
@@ -154,12 +185,15 @@ export class SlackBot {
         // Get list of selected members
         const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
+        // Pull Requests
+        const pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
+
         const attendees = selectedMemberIds.selected_users!;
         let memberInfos: UsersInfoResponse[] = [];
         if (attendees.length > 0) {
             memberInfos = await this.queryUsers(attendees, client);
         }
-        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, memberInfos, logger);
+        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
 
         await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
 
@@ -170,7 +204,9 @@ export class SlackBot {
             icon_url: userInfo.user?.profile?.image_72,
             blocks: blocks,
             text: userInfoMsg,
-            mrkdwn: true
+            mrkdwn: true,
+            unfurl_links: false,
+            unfurl_media: false
         };
     }
 
@@ -250,6 +286,7 @@ export class SlackBot {
     private async buildOutputBlocks(userInfoMsg: string,
                                     yesterday: string, today: string,
                                     parkingLotItems: string | null | undefined,
+                                    pullRequests: string | null | undefined,
                                     parkingLotAttendees: UsersInfoResponse[],
                                     logger: Logger) {
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
@@ -275,6 +312,18 @@ export class SlackBot {
                 }
             }
         ];
+
+        if (pullRequests) {
+            blocks.push(
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: ":computer: *Pull Requests for Review*\n" + pullRequests
+                    }
+                }
+            );
+        }
 
         if (parkingLotItems) {
             blocks.push(
