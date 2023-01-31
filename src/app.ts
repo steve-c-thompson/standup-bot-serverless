@@ -1,4 +1,4 @@
-import {App, AwsLambdaReceiver, LogLevel, ModalView} from '@slack/bolt';
+import {App, AwsLambdaReceiver, LogLevel, ModalView, ViewOutput} from '@slack/bolt';
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
@@ -65,6 +65,8 @@ const init = async () => {
        try {
            await client.chat.postMessage (chatPostMessageArguments);
            await ack();
+           const disclaimer = await slackBot.createChatMessageEditDisclaimer(view);
+           await client.chat.postEphemeral(disclaimer);
        }
        catch (error) {
            logger.error(error);

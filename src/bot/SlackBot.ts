@@ -1,5 +1,6 @@
 import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 export class SlackBot {
 
@@ -132,7 +133,7 @@ export class SlackBot {
 
         const userInfo = await this.queryUser(userId, client);
 
-        const userInfoMsg = userInfo.user?.real_name + " - standup status";
+        const userInfoMsg = userInfo.user?.real_name!;
 
         // Yesterday
         const yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
@@ -157,16 +158,19 @@ export class SlackBot {
         };
     }
 
-    private buildOutputMsg(yesterday: string, today: string, parkingLotItems: string | null | undefined, parkingLotAttendees: string) {
-        let output = "*Yesterday*\n" + yesterday + "\n"
-            + "*Today*\n" + today + "\n";
-        if(parkingLotItems) {
-            output += "*Parking Lot Items* \n" +parkingLotItems + "\n"
+    public async createChatMessageEditDisclaimer(view: ViewOutput) : Promise<ChatPostEphemeralArguments> {
+        const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
+        const channelId = pm.channelId!;
+        const userId = pm.userId!;
+
+        const blocks = [];
+        blocks.push(this.buildEditDisclaimerBlock());
+        return {
+            channel: channelId,
+            user: userId,
+            blocks: blocks,
         }
-        if(parkingLotAttendees.length > 0){
-            output += "*Parking Lot Attendees*\n" + parkingLotAttendees + "\n";
-        }
-        return output;
+
     }
 
     private async buildOutputBlocks(userInfoMsg: string,
@@ -180,8 +184,7 @@ export class SlackBot {
                 type: "header",
                 text: {
                     type: "plain_text",
-                    text: userInfoMsg,
-                    emoji: true
+                    text: userInfoMsg + " :speaking_head_in_silhouette:",
                 }
             },
             {
@@ -199,6 +202,7 @@ export class SlackBot {
                 }
             }
         ];
+        console.log(blocks);
 
         if (parkingLotItems) {
             blocks.push(
@@ -245,17 +249,17 @@ export class SlackBot {
             }
         }
 
-        // Add disclaimer
-        blocks.push({
+        return blocks;
+    }
+
+    private buildEditDisclaimerBlock() {
+        return {
             type: "context",
             elements: [{
                 type: "mrkdwn",
-                text: "You cannot edit this post. Add any updates in its thread :thread:"
+                text: "You cannot edit your standup post. Add any updates in its thread :thread:"
             }]
-        } );
-
-
-        return blocks;
+        };
     }
 
     private async queryUsers(users: string[], client: WebClient) {
