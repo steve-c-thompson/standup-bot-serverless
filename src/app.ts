@@ -42,7 +42,7 @@ const init = async () => {
             attachments.push({
                 "text": "`/standup` and enter your status in the modal"
                     + "\n`/standup [parking-lot | parking_lot | parkinglot | -p]` to display items in the parking lot (visible only to you)"
-                    + "\n`/standup post [parking-lot | parking_lot | parkinglot]` to post parking lot items to channel"
+                    + "\n`/standup post [parking-lot | parking_lot | parkinglot | -p]` to post parking lot items to channel"
 
             });
             await client.chat.postEphemeral({
@@ -59,7 +59,7 @@ const init = async () => {
                 user: body.user_id
             })
         }
-        else if (args == "post parking-lot" || args == "post parking_lot" || args == "post parkinglot") {
+        else if (args == "post parking-lot" || args == "post parking_lot" || args == "post parkinglot" || args == "post -p") {
             const parkingLotMsg = await slackBot.buildParkingLotDisplayData(body.channel_id, new Date(), client);
             await client.chat.postMessage({
                 text: ":car: *Parking Lot*\n" + parkingLotMsg,
