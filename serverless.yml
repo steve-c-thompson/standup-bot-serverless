@@ -11,6 +11,25 @@ provider:
   region: ${opt:region, 'us-west-2'}
   memorySize: 256
   logRetentionInDays: 5
+resources:
+  Resources:
+    RandoDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "channelId"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "channelId"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.stage}_STANDUP_PARKING_LOT_DATA
+        TimeToLiveSpecification:
+          AttributeName: timeToLive
+          Enabled: true
 functions:
   slack:
     handler: src/app.handler
@@ -30,6 +49,19 @@ functions:
               - Ref: 'AWS::AccountId'
               - 'secret'
               - 'SlackStandup-secret-*'
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+        Resource:
+          Fn::Join:
+            - ':'
+            - - 'arn:aws:dynamodb'
+              - ${self:provider.region}
+              - Ref: 'AWS::AccountId'
+              - 'table/*_STANDUP_PARKING_LOT_DATA'
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function

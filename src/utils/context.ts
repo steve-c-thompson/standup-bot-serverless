@@ -1,8 +1,11 @@
 import * as AWS from "aws-sdk";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
 import winston, {createLogger} from "winston";
+import {DynamoDB} from "aws-sdk";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
+export const standupParkingLotTableName = "STANDUP_PARKING_LOT_DATA";
+export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
 export const logger = createLogger( {
     level: 'info',
@@ -17,6 +20,8 @@ export const context = isLocal() ? createLocalContext() : isDev()? createDevCont
 export interface Context {
     secretsManager : SecretsManager;
     secretName: SecretName;
+    dynamoDbClient: DynamoDB;
+    tableNamePrefix: DynamoTableNamePrefix
 }
 
 function createContext(): Context {
@@ -24,6 +29,8 @@ function createContext(): Context {
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
+        dynamoDbClient: new DynamoDB({}),
+        tableNamePrefix: "prod_"
     };
 }
 
@@ -32,6 +39,8 @@ function createDevContext(): Context {
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
+        dynamoDbClient: new DynamoDB({}),
+        tableNamePrefix: "dev_"
     };
 }
 
@@ -62,7 +71,16 @@ function createLocalContext(): Context {
             },
             region: AWS.config.region,
         }),
-        secretName: "SlackStandup-secret-dev"
+        secretName: "SlackStandup-secret-dev",
+        dynamoDbClient: new DynamoDB({
+            endpoint: "http://localhost:4566",
+            credentials: {
+                accessKeyId: AWS.config.credentials?.accessKeyId!,
+                secretAccessKey: AWS.config.credentials?.secretAccessKey!
+            },
+            region: AWS.config.region,
+        }),
+        tableNamePrefix: "local_"
     };
 }
 
