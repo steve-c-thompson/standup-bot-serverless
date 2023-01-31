@@ -186,7 +186,7 @@ export class SlackBot {
         const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
         // Pull Requests
-        const pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value!;
+        const pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
         const attendees = selectedMemberIds.selected_users!;
         let memberInfos: UsersInfoResponse[] = [];
