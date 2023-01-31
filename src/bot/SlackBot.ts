@@ -1,8 +1,16 @@
 import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
+import {StandupParkingLotData} from "../data/StandupParkingLotData";
 
 export class SlackBot {
+
+    private dao: StandupParkingLotDataDao;
+
+    constructor(dao: StandupParkingLotDataDao) {
+        this.dao = dao;
+    }
 
     /**
      * Create the initial modal view. block_id and action_id are hardcoded.
@@ -13,11 +21,11 @@ export class SlackBot {
     public async buildModalView(body: SlashCommand, client: WebClient, logger: Logger): Promise<ViewsOpenArguments> {
         const channelId = body.channel_id;
 
-       // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
+        // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
 
         const pm: PrivateMetadata = {
-          channelId: channelId,
-          userId: body.user_id
+            channelId: channelId,
+            userId: body.user_id
         };
 
         return {
@@ -37,7 +45,7 @@ export class SlackBot {
                 blocks: [
                     {
                         type: "input",
-                        block_id : "yesterday",
+                        block_id: "yesterday",
                         element: {
                             type: "plain_text_input",
                             multiline: true,
@@ -52,7 +60,7 @@ export class SlackBot {
                     },
                     {
                         type: "input",
-                        block_id : "today",
+                        block_id: "today",
                         element: {
                             type: "plain_text_input",
                             multiline: true,
@@ -66,8 +74,8 @@ export class SlackBot {
                     },
                     {
                         type: "input",
-                        block_id : "parking-lot",
-                        optional : true,
+                        block_id: "parking-lot",
+                        optional: true,
                         element: {
                             type: "plain_text_input",
                             multiline: true,
@@ -82,7 +90,7 @@ export class SlackBot {
                     {
                         type: "input",
                         optional: true,
-                        block_id : "parking-lot-participants",
+                        block_id: "parking-lot-participants",
                         element: {
                             type: "multi_users_select",
                             placeholder: {
@@ -125,7 +133,7 @@ export class SlackBot {
         return memberIds;
     }
 
-    public async createChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
+    public async createAndHandleChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
         // channel_id and maybe user_id stored from submit
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
         const channelId = pm.channelId!;
@@ -146,7 +154,15 @@ export class SlackBot {
         // Get list of selected members
         const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
-        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, selectedMemberIds.selected_users!, client, logger);
+        const attendees = selectedMemberIds.selected_users!;
+        let memberInfos: UsersInfoResponse[] = [];
+        if (attendees.length > 0) {
+            memberInfos = await this.queryUsers(attendees, client);
+        }
+        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, memberInfos, logger);
+
+        await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+
         // post as the user who requested
         return {
             channel: channelId,
@@ -158,7 +174,7 @@ export class SlackBot {
         };
     }
 
-    public async createChatMessageEditDisclaimer(view: ViewOutput) : Promise<ChatPostEphemeralArguments> {
+    public async createChatMessageEditDisclaimer(view: ViewOutput): Promise<ChatPostEphemeralArguments> {
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
         const channelId = pm.channelId!;
         const userId = pm.userId!;
@@ -170,15 +186,69 @@ export class SlackBot {
             user: userId,
             blocks: blocks,
         }
+    }
 
+    public async buildParkingLotDisplayData(channelId: string, date: Date, client: WebClient): Promise<string> {
+        let p: StandupParkingLotData | null = await this.dao.getChannelParkingLotDataForDate(channelId, date);
+        if (p) {
+            let proms = await p.parkingLotData!.map(async i => {
+                let u = await this.queryUser(i.userId, client);
+                return u.user?.real_name + " | " + i.content + " | " + i.attendees!.join(", ");
+            }).flat();
+            let out = await Promise.all(proms);
+            return out.join("\n");
+        }
+        return "No parking lot items today";
+    }
+
+    public async saveParkingLotData(channelId: string,
+                                    date: Date,
+                                    userId: string,
+                                    parkingLotItems: string | null | undefined,
+                                    parkingLotAttendees: UsersInfoResponse[]) {
+        if (parkingLotItems || parkingLotAttendees.length > 0) {
+            let plNames: string[] = [];
+            if (parkingLotAttendees.length > 0) {
+                plNames = parkingLotAttendees.map((m) => {
+                    return m.user?.real_name!
+                });
+            }
+            // check if this object already exists
+            let d = await this.dao.getChannelParkingLotDataForDate(channelId, date);
+            if (d) {
+                // updating, add or replace item for user
+                let foundIndex = d.parkingLotData!.findIndex(p => {
+                    return p.userId == userId;
+                });
+                if (foundIndex >= 0) {
+                    d.parkingLotData![foundIndex] = {
+                        userId: userId,
+                        attendees: plNames,
+                        content: parkingLotItems ? parkingLotItems : ""
+                    }
+                }
+                await this.dao.updateStandupParkingLotData(d);
+            } else {
+                d = new StandupParkingLotData();
+                d.standupDate = date;
+                d.channelId = channelId;
+                d.parkingLotData = [
+                    {
+                        content: parkingLotItems ? parkingLotItems : "",
+                        userId: userId,
+                        attendees: plNames
+                    }
+                ]
+                await this.dao.putStandupParkingLotData(d);
+            }
+        }
     }
 
     private async buildOutputBlocks(userInfoMsg: string,
                                     yesterday: string, today: string,
-                              parkingLotItems: string | null | undefined,
-                              parkingLotAttendees: string[],
-                              client: WebClient,
-                              logger: Logger) {
+                                    parkingLotItems: string | null | undefined,
+                                    parkingLotAttendees: UsersInfoResponse[],
+                                    logger: Logger) {
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
             {
                 type: "header",
@@ -202,7 +272,6 @@ export class SlackBot {
                 }
             }
         ];
-        console.log(blocks);
 
         if (parkingLotItems) {
             blocks.push(
@@ -217,14 +286,13 @@ export class SlackBot {
         }
         if (parkingLotAttendees.length > 0) {
             try {
-                const memberInfos = await this.queryUsers(parkingLotAttendees, client);
                 // Text output
-                const memberOutput = this.formatMembersForOutput(memberInfos);
+                const memberOutput = this.formatMembersForOutput(parkingLotAttendees);
                 const context: ContextBlock = {
                     type: "context",
                     elements: []
                 };
-                memberInfos.forEach(m => {
+                parkingLotAttendees.forEach(m => {
                     context.elements.push(
                         {
                             type: "image",
