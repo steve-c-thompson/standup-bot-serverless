@@ -9,6 +9,7 @@ export class AwsSecretsDataSource implements SecretDataSource{
     }
 
     async buildSecretPromise(secretToken: string) : Promise<string> {
+        // logger.debug("Fetching secretToken " + secretToken + " from secret named " + context.secretName);
         return new Promise((resolve, reject) => {
             let sp = getSecretValue(this.secretsManager, context.secretName);
             sp.then((sec) => {

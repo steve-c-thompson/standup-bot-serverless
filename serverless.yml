@@ -13,16 +13,20 @@ provider:
   logRetentionInDays: 5
 resources:
   Resources:
-    RandoDynamoDbTable:
+    ParkingLotDynamoDbTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
           - AttributeName: "channelId"
             AttributeType: "S"
+          - AttributeName: "standupDate"
+            AttributeType: "N"
         KeySchema:
           - AttributeName: "channelId"
             KeyType: "HASH"
+          - AttributeName: "standupDate"
+            KeyType: "RANGE"
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1

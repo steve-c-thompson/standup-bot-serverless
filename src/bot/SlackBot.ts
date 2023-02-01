@@ -195,7 +195,11 @@ export class SlackBot {
         }
         const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
 
-        await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+        try {
+            await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+        } catch (e) {
+            logger.error(e);
+        }
 
         // post as the user who requested
         return {
