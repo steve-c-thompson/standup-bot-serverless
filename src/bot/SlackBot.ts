@@ -271,7 +271,15 @@ export class SlackBot {
                         attendees: plNames,
                         content: parkingLotItems ? parkingLotItems : ""
                     }
+                } else {
+                    // push the new item onto the list
+                    d.parkingLotData!.push({
+                        userId: userId,
+                        attendees: plNames,
+                        content: parkingLotItems ? parkingLotItems : ""
+                    });
                 }
+
                 await this.dao.updateStandupParkingLotData(d);
             } else {
                 d = new StandupParkingLotData();
