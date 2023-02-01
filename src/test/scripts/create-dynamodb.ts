@@ -2,7 +2,7 @@
 
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {StandupParkingLotData} from "../../data/StandupParkingLotData";
-import {context, standupParkingLotTableName} from "../../utils/context";
+import {context, standupParkingLotTableName, logger} from "../../utils/context";
 import {DynamoDbStandupParkingLotDataDao} from "../../data/DynamoDbStandupParkingLotDataDao";
 
 export const jan1 = new Date(2020, 0, 1);
@@ -19,7 +19,7 @@ export async function createDynamodb() {
             readCapacityUnits: 5,
             writeCapacityUnits: 5
         });
-        console.log(`Dynamo table ${context.tableNamePrefix + standupParkingLotTableName} created`);
+        logger.info(`Dynamo table ${context.tableNamePrefix + standupParkingLotTableName} created`);
     } catch (e) {
         console.error("Error creating Dynamo table", e);
     }

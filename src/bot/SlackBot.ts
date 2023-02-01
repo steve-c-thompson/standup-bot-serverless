@@ -195,7 +195,11 @@ export class SlackBot {
         }
         const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
 
-        await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+        try {
+            await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+        } catch (e) {
+            logger.error(e);
+        }
 
         // post as the user who requested
         return {
@@ -216,11 +220,13 @@ export class SlackBot {
         const userId = pm.userId!;
 
         const blocks = [];
-        blocks.push(this.buildEditDisclaimerBlock());
+        const msg = "You cannot edit your standup post. Add any updates in its thread :thread:"
+        blocks.push(this.buildEditDisclaimerBlock(msg));
         return {
             channel: channelId,
             user: userId,
             blocks: blocks,
+            text: msg
         }
     }
 
@@ -372,12 +378,12 @@ export class SlackBot {
         return blocks;
     }
 
-    private buildEditDisclaimerBlock() {
+    private buildEditDisclaimerBlock(msg: string) {
         return {
             type: "context",
             elements: [{
                 type: "mrkdwn",
-                text: "You cannot edit your standup post. Add any updates in its thread :thread:"
+                text: msg
             }]
         };
     }

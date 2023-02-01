@@ -1,7 +1,7 @@
 import {StandupParkingLotDataDao} from "./StandupParkingLotDataDao";
 import {ParkingLotDataItem, StandupParkingLotData} from "./StandupParkingLotData";
 import {DynamoDB} from "aws-sdk";
-import {context} from "../utils/context";
+import {context, logger} from "../utils/context";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 
 /**
@@ -21,11 +21,13 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
         const toFetch = new StandupParkingLotData();
         toFetch.channelId = id;
         toFetch.standupDate = DynamoDbStandupParkingLotDataDao.createZeroUtcDate(date);
+        logger.debug("Fetching standup data " + id + " with date " + toFetch.standupDate.getTime());
         return Promise.resolve(this.mapper.get(toFetch)).catch(() => {return null});
     }
 
     async putStandupParkingLotData(data: StandupParkingLotData): Promise<StandupParkingLotData> {
         this.validateAndSetStandupDate(data);
+        logger.debug("Storing standup data " + data.channelId + " with date " + data.standupDate?.getTime());
         return this.mapper.put(data);
     }
 
