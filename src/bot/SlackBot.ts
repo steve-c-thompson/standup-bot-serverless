@@ -220,11 +220,13 @@ export class SlackBot {
         const userId = pm.userId!;
 
         const blocks = [];
-        blocks.push(this.buildEditDisclaimerBlock());
+        const msg = "You cannot edit your standup post. Add any updates in its thread :thread:"
+        blocks.push(this.buildEditDisclaimerBlock(msg));
         return {
             channel: channelId,
             user: userId,
             blocks: blocks,
+            text: msg
         }
     }
 
@@ -376,12 +378,12 @@ export class SlackBot {
         return blocks;
     }
 
-    private buildEditDisclaimerBlock() {
+    private buildEditDisclaimerBlock(msg: string) {
         return {
             type: "context",
             elements: [{
                 type: "mrkdwn",
-                text: "You cannot edit your standup post. Add any updates in its thread :thread:"
+                text: msg
             }]
         };
     }
