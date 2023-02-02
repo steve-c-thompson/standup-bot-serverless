@@ -69,7 +69,7 @@ const init = async () => {
         }
         else {
             try {
-                let payload = await slackBot.buildModalView(body, client, logger);
+                let payload = slackBot.buildModalView(body, logger);
                 const result = await client.views.open(
                     payload
                 );
