@@ -6,7 +6,10 @@ import {StandupParkingLotData} from "../data/StandupParkingLotData";
 
 export class SlackBot {
 
+    private SHORTCUT_STORY_URL = "https://app.shortcut.com/homebound-team/story/";
     private dao: StandupParkingLotDataDao;
+
+    private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
 
     constructor(dao: StandupParkingLotDataDao) {
         this.dao = dao;
@@ -43,6 +46,18 @@ export class SlackBot {
                     text: 'Async Standup Status'
                 },
                 blocks: [
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
+                            }
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
                     {
                         type: "input",
                         block_id: "yesterday",
@@ -175,24 +190,39 @@ export class SlackBot {
         const userInfoMsg = userInfo.user?.real_name!;
 
         // Yesterday
-        const yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
+        let yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
         // Today
-        const today = view['state']['values']['today']['today-action'].value!;
+        let today = view['state']['values']['today']['today-action'].value!;
         // Parking Lot
-        const parkingLot = view['state']['values']['parking-lot']['parking-lot-action'].value;
+        let parkingLot = view['state']['values']['parking-lot']['parking-lot-action'].value;
 
         // Parking Lot Attendees
         // Get list of selected members
         const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
         // Pull Requests
-        const pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
+        let pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
         const attendees = selectedMemberIds.selected_users!;
         let memberInfos: UsersInfoResponse[] = [];
         if (attendees.length > 0) {
             memberInfos = await this.queryUsers(attendees, client);
         }
+
+        yesterday = this.formatTextNumbersToStories(yesterday);
+
+        today = this.formatTextNumbersToStories(today);
+
+        if(parkingLot)
+        {
+            parkingLot = this.formatTextNumbersToStories(parkingLot);
+        }
+
+        if(pullRequests)
+        {
+            pullRequests = this.formatTextNumbersToStories(pullRequests);
+        }
+
         const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
 
         try {
@@ -492,4 +522,9 @@ export class SlackBot {
     private atMember(id: string) {
         return "<@" + id + ">";
     }
+
+    private formatTextNumbersToStories(content: string) {
+        return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$1" + "|$1>");
+    }
+
 }
