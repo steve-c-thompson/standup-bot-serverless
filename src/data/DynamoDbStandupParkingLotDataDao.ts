@@ -37,6 +37,67 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
         return this.mapper.update(data, {onMissing: "skip"});
     }
 
+    async upsertStandupParkingLotData(channelId: string,
+                                      date: Date,
+                                      userId: string,
+                                      parkingLotItems: string | null | undefined,
+                                      parkingLotAttendees: string[]): Promise<StandupParkingLotData | null> {
+        if (parkingLotItems || parkingLotAttendees.length > 0) {
+            // check if this object already exists
+            let d = await this.getChannelParkingLotDataForDate(channelId, date);
+            if (d) {
+                // updating, add or replace item for user
+                let foundIndex = d.parkingLotData!.findIndex(p => {
+                    return p.userId == userId;
+                });
+                if (foundIndex >= 0) {
+                    d.parkingLotData![foundIndex] = {
+                        userId: userId,
+                        attendees: parkingLotAttendees,
+                        content: parkingLotItems ? parkingLotItems : ""
+                    }
+                } else {
+                    // push the new item onto the list
+                    d.parkingLotData!.push({
+                        userId: userId,
+                        attendees: parkingLotAttendees,
+                        content: parkingLotItems ? parkingLotItems : ""
+                    });
+                }
+
+                return this.updateStandupParkingLotData(d);
+            } else {
+                d = new StandupParkingLotData();
+                d.standupDate = date;
+                d.channelId = channelId;
+                d.parkingLotData = [
+                    {
+                        content: parkingLotItems ? parkingLotItems : "",
+                        userId: userId,
+                        attendees: parkingLotAttendees
+                    }
+                ]
+                return this.putStandupParkingLotData(d);
+            }
+        }
+        return null;
+    }
+
+    async removeStandupParkingLotData(channelId: string, date: Date, userId: string): Promise<StandupParkingLotData | null> {
+        let d = await this.getChannelParkingLotDataForDate(channelId, date);
+        if(d) {
+            // updating, add or replace item for user
+            let foundIndex = d.parkingLotData!.findIndex(p => {
+                return p.userId == userId;
+            });
+            if (foundIndex >= 0) {
+                d.parkingLotData!.splice(foundIndex, 1);
+               return this.updateStandupParkingLotData(d);
+            }
+        }
+        return null;
+    }
+
     private validateAndSetStandupDate(data: StandupParkingLotData) {
         if(!data.standupDate) {
             data.standupDate = new Date();

@@ -1,5 +1,5 @@
-import {KnownBlock, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
-import {Block, ContextBlock, HeaderBlock, Logger, Option, SectionBlock, ViewOutput} from "@slack/bolt";
+import {UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
+import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {StandupInputData} from "./SlackBot";
 
@@ -9,64 +9,36 @@ export class ParkingLotDisplayItem {
     attendeeIds: string[]
 }
 
-export const messageTypePost = "post";
-export const messageTypeDisplay = "display";
+export class DeleteCommand {
+    channelId: string
+    messageId: string
+    postAt: string
+    userId: string
+
+    constructor(messageId: string, channelId: string, postAt: string, userId: string) {
+        this.messageId = messageId;
+        this.channelId = channelId;
+        this.postAt = postAt;
+        this.userId = userId;
+    }
+
+    public formatForTransfer(): string {
+        return this.messageId + "#" + this.channelId + "#" + this.postAt + "#" + this.userId;
+    }
+
+    public static buildFromString(str: string) : DeleteCommand | null{
+        let parts = str.split("#");
+        if(parts.length != 4) {
+            return null;
+        }
+        return new DeleteCommand(parts[0], parts[1], parts[2], parts[3]);
+    }
+}
 
 export class BotViewBuilder {
 
     private SHORTCUT_STORY_URL = "https://app.shortcut.com/homebound-team/story/";
     private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
-    private postOption: Option = {
-        "text": {
-            "type": "mrkdwn",
-            "text": "Post to channel"
-        },
-        "value": messageTypePost,
-        "description": {
-            "type": "plain_text",
-            "text": "This will post in the channel immediately."
-        }
-    };
-
-    private postToChannelSection: KnownBlock[] = [
-        {
-            type: "section",
-            block_id: "message-type",
-            text: {
-                type: "mrkdwn",
-                text: "You may post status to the channel or create a message visible only to you."
-            },
-            accessory: {
-                type: "radio_buttons",
-                action_id: "message-type-action",
-                initial_option: this.postOption,
-                options: [
-                    this.postOption,
-                    {
-                        text: {
-                            type: "mrkdwn",
-                            text: "Display only",
-                        },
-                        value: messageTypeDisplay,
-                        description: {
-                            type: "plain_text",
-                            text: "This will display only to you. You must post your status manually."
-                        }
-
-                    }
-                ]
-            }
-        },
-        {
-            type: "context",
-            elements: [
-                {
-                    type: "mrkdwn",
-                    text: "Displaying status will allow you to schedule or edit the message, but any *Parking Lot* items will not be tracked for display with the `parking-lot` option."
-                        + "\n\nSee `standup /help` for more information.",
-                },
-            ]
-        }];
 
     /**
      *
@@ -75,6 +47,7 @@ export class BotViewBuilder {
      */
     public buildModalInputView(trigger_id: string, pm: PrivateMetadata): ViewsOpenArguments {
 
+        // const date = this.buildInitialScheduleDate();
         let args: ViewsOpenArguments = {
             trigger_id: trigger_id,
             // View payload
@@ -91,16 +64,16 @@ export class BotViewBuilder {
                 },
                 blocks: [
                     {
-                        "type": "context",
-                        "elements": [
+                        type: "context",
+                        elements: [
                             {
-                                "type": "mrkdwn",
-                                "text": "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
+                                type: "mrkdwn",
+                                text: "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
                             },
                         ]
                     },
                     {
-                        "type": "divider"
+                        type: "divider"
                     },
                     {
                         type: "input",
@@ -196,25 +169,105 @@ export class BotViewBuilder {
                             emoji: true
                         }
                     },
+                    {
+                        type: "input",
+                        block_id: "schedule-date",
+                        optional: true,
+                        label: {
+                            type: "plain_text",
+                            text: "Optionally schedule this status."
+                        },
+                        element:
+                        {
+                            type: "datepicker",
+                            action_id: "schedule-date-action"
+                        },
+                    },
+                    {
+                        type: "input",
+                        block_id: "schedule-time",
+                        optional: true,
+                        element:
+                        {
+                            type: "timepicker",
+                            action_id: "schedule-time-action"
+                        },
+                        label: {
+                            type: "plain_text",
+                            text: " "
+                        }
+                    },
                 ],
                 submit: {
                     type: 'plain_text',
                     text: 'Submit'
                 }
-
             }
         };
-        // add the post section as the last set of blocks
-        args.view.blocks.push(...this.postToChannelSection);
         return args;
     }
 
-    public buildOutputBlocks(userInfoMsg: string,
-                                    yesterday: string, today: string,
-                                    parkingLotItems: string | null | undefined,
-                                    pullRequests: string | null | undefined,
-                                    parkingLotAttendees: UsersInfoResponse[],
-                                    logger: Logger) {
+    /**
+     * If it is after 5pm, day is tomorrow. Otherwise assume today. 9am
+     * Edge cases of next month handled by Date
+     * @private
+     */
+    private buildInitialScheduleDate() :Date {
+        const d = new Date();
+        if(d.getHours() >= 16){
+            d.setDate(d.getDate() + 1);
+        }
+        d.setHours(8, 0, 0, 0);
+        return d;
+    }
+
+    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: string, userId: string) : ChatPostEphemeralArguments {
+        let postDt = new Date(Number(postAt));
+        const msg = "Your status is scheduled to send\n "
+            + postDt.toLocaleDateString()
+        + " at " + postDt.toLocaleTimeString();
+
+        const cmd = new DeleteCommand(msgId, channelId, postAt, userId);
+        return {
+            blocks: [
+                {
+                    type: "section",
+                    block_id: "delete-msg",
+                    text: {
+                        type: "plain_text",
+                        text: msg
+                    },
+                    accessory: {
+                        type:"button",
+                        style: "danger",
+                        text: {
+                            type: "plain_text",
+                            text: "Delete Scheduled Status"
+                        },
+                        action_id: "delete-msg-action",
+                        value: cmd.formatForTransfer(),
+                        confirm: {
+                            text: {
+                                type: "plain_text",
+                                text: "Are you sure you want to delete this status?"
+                            }
+                        }
+
+                    }
+                }
+            ],
+            channel: channelId,
+            user: userId,
+            text: msg
+        }
+    }
+
+    public buildChatMessageOutputBlocks(userInfoMsg: string,
+                                        yesterday: string, today: string,
+                                        parkingLotItems: string | null | undefined,
+                                        pullRequests: string | null | undefined,
+                                        parkingLotAttendees: UsersInfoResponse[],
+                                        logger: Logger) {
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
             {
                 type: "header",

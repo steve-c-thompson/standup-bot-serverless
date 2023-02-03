@@ -1,18 +1,24 @@
-import {Logger, SlashCommand, ViewOutput} from "@slack/bolt";
-import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
+import {BlockAction, ButtonAction, Logger, SlashCommand, ViewOutput} from "@slack/bolt";
+import {
+    ChatPostMessageArguments,
+    ChatScheduleMessageArguments,
+    UsersInfoResponse,
+    ViewsOpenArguments,
+    WebClient
+} from "@slack/web-api";
 import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
-import {BotViewBuilder, messageTypeDisplay, ParkingLotDisplayItem} from "./BotViewBuilder";
+import {BotViewBuilder, DeleteCommand, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 export class StandupInputData {
     pm: PrivateMetadata
     yesterday: string
     today: string
-    parkingLot: string | null | undefined
+    parkingLot?: string | null | undefined
     attendees: string[] = []
-    pullRequests: string | null | undefined
-    messageType: string
+    pullRequests?: string | null | undefined
+    scheduleDateTime?: number | null | undefined
 }
 
 export class SlackBot {
@@ -32,7 +38,7 @@ export class SlackBot {
     public buildModalView(body: SlashCommand, logger: Logger): ViewsOpenArguments {
         const channelId = body.channel_id;
 
-        // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
+        // let memberIds = await this.loadMemberIdsForModal(messageId, logger, client, body);
 
         const pm: PrivateMetadata = {
             channelId: channelId,
@@ -78,9 +84,14 @@ export class SlackBot {
         // Pull Requests
         let pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
+        let dateStr = view['state']['values']['schedule-date']['schedule-date-action']['selected_date'];
+        let timeStr = view['state']['values']['schedule-time']['schedule-time-action']['selected_time'];
+
+        let dateTime: number;
+        if(dateStr && timeStr) {
+            dateTime = Date.parse(dateStr + "T" + timeStr + ":00");
+        }
         const attendees = selectedMemberIds.selected_users!;
-        // Message type
-        let msgType = view['state']['values']['message-type']['message-type-action']['selected_option']!.value;
 
         return {
             pm: pm,
@@ -89,10 +100,10 @@ export class SlackBot {
             parkingLot: parkingLot,
             attendees: attendees,
             pullRequests: pullRequests,
-            messageType: msgType
+            scheduleDateTime: dateTime!,
         }
     }
-    public async createChatMessageFromViewOutputAndSaveData(viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatPostEphemeralArguments> {
+    public async createChatMessageFromViewOutputAndSaveData(viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatScheduleMessageArguments> {
         // channel_id and maybe user_id stored from submit
         const channelId = viewInput.pm.channelId!;
         const userId = viewInput.pm.userId!;
@@ -101,13 +112,12 @@ export class SlackBot {
 
         const userInfoMsg = userInfo.user?.real_name!;
 
-
         let memberInfos: UsersInfoResponse[] = [];
         if (viewInput.attendees.length > 0) {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
+        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
             await this.saveParkingLotData(channelId, new Date(), userId, viewInput.parkingLot, memberInfos);
@@ -151,50 +161,10 @@ export class SlackBot {
                                     userId: string,
                                     parkingLotItems: string | null | undefined,
                                     parkingLotAttendees: UsersInfoResponse[]) {
-        if (parkingLotItems || parkingLotAttendees.length > 0) {
-            let plNames: string[] = [];
-            if (parkingLotAttendees.length > 0) {
-                plNames = parkingLotAttendees.map((m) => {
-                    return m.user?.id!
-                });
-            }
-            // check if this object already exists
-            let d = await this.dao.getChannelParkingLotDataForDate(channelId, date);
-            if (d) {
-                // updating, add or replace item for user
-                let foundIndex = d.parkingLotData!.findIndex(p => {
-                    return p.userId == userId;
-                });
-                if (foundIndex >= 0) {
-                    d.parkingLotData![foundIndex] = {
-                        userId: userId,
-                        attendees: plNames,
-                        content: parkingLotItems ? parkingLotItems : ""
-                    }
-                } else {
-                    // push the new item onto the list
-                    d.parkingLotData!.push({
-                        userId: userId,
-                        attendees: plNames,
-                        content: parkingLotItems ? parkingLotItems : ""
-                    });
-                }
-
-                await this.dao.updateStandupParkingLotData(d);
-            } else {
-                d = new StandupParkingLotData();
-                d.standupDate = date;
-                d.channelId = channelId;
-                d.parkingLotData = [
-                    {
-                        content: parkingLotItems ? parkingLotItems : "",
-                        userId: userId,
-                        attendees: plNames
-                    }
-                ]
-                await this.dao.putStandupParkingLotData(d);
-            }
-        }
+        const pla = parkingLotAttendees.map(u => {
+            return u.user?.id!;
+        })
+        await this.dao.upsertStandupParkingLotData(channelId, date, userId, parkingLotItems, pla);
     }
 
     private async queryUsers(users: string[], client: WebClient) {
@@ -278,4 +248,33 @@ export class SlackBot {
     public createChatMessageEditDisclaimer(viewInput: StandupInputData) {
         return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
+
+    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: string, userId: string) : ChatPostEphemeralArguments {
+        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId);
+    }
+
+    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) {
+        console.log(JSON.stringify(body, null, 2));
+        let button = body["actions"].find(i => i.action_id === "delete-msg-action");
+        let msgVal = (button as ButtonAction).value;
+
+        let cmd = DeleteCommand.buildFromString(msgVal);
+        if(cmd) {
+            try {
+                await client.chat.deleteScheduledMessage(
+                    {
+                        channel: cmd.messageId,
+                        scheduled_message_id: cmd.messageId,
+                        token: body.token
+                    }
+                );
+            }
+            catch(e) {
+                logger.error(e);
+            }
+        // also clean up the parking lot items
+        }
+
+    }
+
 }
