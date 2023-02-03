@@ -1,4 +1,4 @@
-import {UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
+import {ChatScheduleMessageArguments, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
 import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {StandupInputData} from "./SlackBot";
@@ -221,14 +221,14 @@ export class BotViewBuilder {
         return d;
     }
 
-    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string) : ChatPostEphemeralArguments {
+    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
         let postDt = new Date(postAt);
-        const msg = "Your status is scheduled to send on\n "
+        const msg = "Your status below is scheduled to send on\n "
             + postDt.toLocaleDateString()
         + " at " + postDt.toLocaleTimeString();
 
         const cmd = new DeleteCommand(msgId, channelId, postAt, userId);
-        return {
+        const body: ChatPostEphemeralArguments = {
             blocks: [
                 {
                     type: "section",
@@ -254,12 +254,21 @@ export class BotViewBuilder {
                         }
 
                     }
+                },
+                {
+                    type: "divider"
                 }
             ],
             channel: channelId,
             user: userId,
             text: msg
         }
+        body.blocks!.push(...args.blocks!);
+        body.blocks!.push(
+            {
+                type: "divider"
+            });
+        return body;
     }
 
     public buildChatMessageOutputBlocks(userInfoMsg: string,
