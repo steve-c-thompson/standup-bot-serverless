@@ -99,7 +99,9 @@ const init = async () => {
                 let confMessage = slackBot.buildScheduledMessageDelete(msgId,
                     viewInput.pm.channelId!,
                     viewInput.scheduleDateTime,
-                    viewInput.pm.userId!);
+                    viewInput.pm.userId!,
+                    chatMessageArgs);
+
                 await client.chat.postEphemeral(confMessage);
             }else {
                 await client.chat.postMessage(chatMessageArgs);

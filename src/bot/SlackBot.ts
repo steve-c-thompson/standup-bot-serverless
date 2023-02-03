@@ -253,8 +253,8 @@ export class SlackBot {
         return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
 
-    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string) : ChatPostEphemeralArguments {
-        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId);
+    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
+        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId, args);
     }
 
     public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<string> {
@@ -272,7 +272,7 @@ export class SlackBot {
                         scheduled_message_id: cmd.messageId,
                     }
                 );
-                return result.ok ? "Message deleted" : result.error!.toString();
+                return result.ok ? `Message ${cmd.messageId} deleted` : result.error!.toString();
             }
             catch(e) {
                 logger.error(e);
