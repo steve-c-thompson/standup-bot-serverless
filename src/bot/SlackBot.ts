@@ -1,5 +1,6 @@
 import {BlockAction, ButtonAction, Logger, SlashCommand, ViewOutput} from "@slack/bolt";
 import {
+    ChatDeleteScheduledMessageResponse,
     ChatPostMessageArguments,
     ChatScheduleMessageArguments,
     UsersInfoResponse,
@@ -184,6 +185,8 @@ export class SlackBot {
     /**
      * Filter the members list against the full list of users and remove anyone who is not active
      * @param membersList
+     * @param client
+     * @param logger
      * @private
      */
     private async filterMembersListForRemoved(membersList: string[], client: WebClient, logger: Logger): Promise<string[]> {
@@ -249,32 +252,38 @@ export class SlackBot {
         return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
 
-    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: string, userId: string) : ChatPostEphemeralArguments {
+    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string) : ChatPostEphemeralArguments {
         return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId);
     }
 
-    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) {
-        console.log(JSON.stringify(body, null, 2));
+    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<string> {
+        // console.log(JSON.stringify(body, null, 2));
         let button = body["actions"].find(i => i.action_id === "delete-msg-action");
         let msgVal = (button as ButtonAction).value;
 
         let cmd = DeleteCommand.buildFromString(msgVal);
+        console.log(`Deleting message ${cmd?.messageId} for channel ${cmd?.channelId}`);
         if(cmd) {
             try {
-                await client.chat.deleteScheduledMessage(
+                let result = await client.chat.deleteScheduledMessage(
                     {
-                        channel: cmd.messageId,
+                        channel: cmd.channelId,
                         scheduled_message_id: cmd.messageId,
-                        token: body.token
                     }
                 );
+                return result.ok ? "Message deleted" : result.error!.toString();
             }
             catch(e) {
                 logger.error(e);
+                throw e;
             }
-        // also clean up the parking lot items
+            finally {
+                // also clean up the parking lot items
+                console.log(`Removing Standup Parking Lot Data ${cmd.channelId} ${cmd.postAt} ${cmd.userId}`);
+                await this.dao.removeStandupParkingLotData(cmd.channelId, new Date(cmd.postAt), cmd.userId);
+            }
         }
-
+        return "Invalid delete command";
     }
 
 }
