@@ -1,11 +1,9 @@
-import {App, AwsLambdaReceiver, LogLevel, ModalView, ViewOutput} from '@slack/bolt';
+import {App, AwsLambdaReceiver, BlockAction, LogLevel, ModalView} from '@slack/bolt';
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
-import {messageTypePost} from "./bot/BotViewBuilder";
-import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -87,20 +85,24 @@ const init = async () => {
         const viewInput = slackBot.getViewInputValues(view);
         let chatMessageArgs = await slackBot.createChatMessageFromViewOutputAndSaveData(viewInput, client, logger);
         try {
-            console.log("message type " + viewInput.messageType);
-            if(viewInput.messageType === messageTypePost) {
-                console.log("post");
+            if(viewInput.scheduleDateTime) {
+                chatMessageArgs.post_at = viewInput.scheduleDateTime;
+                // let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
+                // Use the response to create a dialog
+                // let msgId = scheduleResponse.scheduled_message_id;
+                let confMessage = slackBot.buildScheduledMessageDelete("12345",
+                    viewInput.pm.channelId!,
+                    viewInput.scheduleDateTime + "",
+                    viewInput.pm.userId!);
+                await client.chat.postEphemeral(confMessage);
+                await ack();
+            }else {
                 await client.chat.postMessage(chatMessageArgs);
                 await ack();
                 const disclaimer = slackBot.createChatMessageEditDisclaimer(viewInput);
-                console.log("disclaimer " + disclaimer);
                 await client.chat.postEphemeral(disclaimer);
             }
-            else {
-                console.log("display");
-                await client.chat.postEphemeral(chatMessageArgs as ChatPostEphemeralArguments);
-                await ack();
-            }
+
         } catch (error) {
             logger.error(error);
             let msg = (error as Error).message;
@@ -141,6 +143,20 @@ const init = async () => {
             }
         }
     });
+
+    app.action({action_id: "delete-msg-action", block_id: "delete-msg"}, async ({body,  ack, say, logger, client }) => {
+        try {
+            await slackBot.deleteScheduledMessage(body as BlockAction, client, logger);
+            await ack();
+        } catch (e) {
+            logger.error(e);
+            await say("An error occurred " + e);
+        }
+
+
+    }
+
+    );
 
     return await awsLambdaReceiver.start();
 }

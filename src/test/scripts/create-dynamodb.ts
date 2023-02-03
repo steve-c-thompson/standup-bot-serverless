@@ -8,6 +8,22 @@ import {DynamoDbStandupParkingLotDataDao} from "../../data/DynamoDbStandupParkin
 export const jan1 = new Date(2020, 0, 1);
 export const jan2 = new Date(2020, 0, 2);
 
+export const testParkingLotData = DynamoDbStandupParkingLotDataDao.standupParkingLotDataObjectFactory("ABC",
+    jan1,
+    [
+        {
+            attendees: ["Dave", "Bobby"],
+            userId: "Ricky",
+            content: "Some content"
+        },
+        {
+            attendees: ["Jenny", "Samara"],
+            userId: "Sarah",
+            content: "Some more content"
+        }
+    ],
+
+);
 export async function createDynamodb() {
     const client = context.dynamoDbClient;
     const mapper = new DataMapper({client: client, tableNamePrefix: context.tableNamePrefix});
@@ -24,24 +40,13 @@ export async function createDynamodb() {
         console.error("Error creating Dynamo table", e);
     }
 
-    const d = DynamoDbStandupParkingLotDataDao.standupParkingLotDataObjectFactory("ABC",
-        jan1,
-        [
-            {
-                attendees: ["Dave", "Bobby"],
-                userId: "Ricky",
-                content: "Some content"
-            },
-            {
-                attendees: ["Jenny", "Samara"],
-                userId: "Sarah",
-                content: "Some more content"
-            }
-        ],
 
-    );
-    const saved = await mapper.put(d);
+    const saved = await mapper.put(testParkingLotData);
     console.log("Saved preloaded data " + JSON.stringify(saved));
+}
+
+export async function dbCleanup() {
+    return createDynamodb();
 }
 
 if (require.main === module) {
