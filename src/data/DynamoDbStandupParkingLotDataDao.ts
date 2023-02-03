@@ -37,6 +37,15 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
         return this.mapper.update(data, {onMissing: "skip"});
     }
 
+    /**
+     * Update standup parking lot data. If there are no content or parking lot attendees, this will
+     * return null.
+     * @param channelId
+     * @param date
+     * @param userId
+     * @param parkingLotItems
+     * @param parkingLotAttendees
+     */
     async upsertStandupParkingLotData(channelId: string,
                                       date: Date,
                                       userId: string,
@@ -94,6 +103,9 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
                 d.parkingLotData!.splice(foundIndex, 1);
                return this.updateStandupParkingLotData(d);
             }
+        }
+        else {
+            logger.warn(`Could not find parking lot data for ${channelId} and ${date.toLocaleString()}`);
         }
         return null;
     }

@@ -4,6 +4,7 @@ import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
+import {ChatScheduleMessageArguments} from "@slack/web-api";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -86,16 +87,20 @@ const init = async () => {
         let chatMessageArgs = await slackBot.createChatMessageFromViewOutputAndSaveData(viewInput, client, logger);
         try {
             if(viewInput.scheduleDateTime) {
-                chatMessageArgs.post_at = viewInput.scheduleDateTime;
-                // let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
+                // Unix timestamp is seconds since epoch
+                chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
+                let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
+                await ack();
+                const date = new Date(scheduleResponse.post_at! * 1000);
+                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send at ${date.toLocaleDateString()} ${date.toLocaleTimeString()} for channel ${scheduleResponse.channel} `);
+
                 // Use the response to create a dialog
-                // let msgId = scheduleResponse.scheduled_message_id;
-                let confMessage = slackBot.buildScheduledMessageDelete("12345",
+                let msgId = scheduleResponse.scheduled_message_id!;
+                let confMessage = slackBot.buildScheduledMessageDelete(msgId,
                     viewInput.pm.channelId!,
-                    viewInput.scheduleDateTime + "",
+                    viewInput.scheduleDateTime,
                     viewInput.pm.userId!);
                 await client.chat.postEphemeral(confMessage);
-                await ack();
             }else {
                 await client.chat.postMessage(chatMessageArgs);
                 await ack();
@@ -146,14 +151,13 @@ const init = async () => {
 
     app.action({action_id: "delete-msg-action", block_id: "delete-msg"}, async ({body,  ack, say, logger, client }) => {
         try {
-            await slackBot.deleteScheduledMessage(body as BlockAction, client, logger);
             await ack();
+            let result = await slackBot.deleteScheduledMessage(body as BlockAction, client, logger);
+            await say(result);
         } catch (e) {
             logger.error(e);
             await say("An error occurred " + e);
         }
-
-
     }
 
     );

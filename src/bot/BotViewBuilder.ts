@@ -12,10 +12,10 @@ export class ParkingLotDisplayItem {
 export class DeleteCommand {
     channelId: string
     messageId: string
-    postAt: string
+    postAt: number
     userId: string
 
-    constructor(messageId: string, channelId: string, postAt: string, userId: string) {
+    constructor(messageId: string, channelId: string, postAt: number, userId: string) {
         this.messageId = messageId;
         this.channelId = channelId;
         this.postAt = postAt;
@@ -31,7 +31,7 @@ export class DeleteCommand {
         if(parts.length != 4) {
             return null;
         }
-        return new DeleteCommand(parts[0], parts[1], parts[2], parts[3]);
+        return new DeleteCommand(parts[0], parts[1], Number(parts[2]), parts[3]);
     }
 }
 
@@ -221,8 +221,8 @@ export class BotViewBuilder {
         return d;
     }
 
-    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: string, userId: string) : ChatPostEphemeralArguments {
-        let postDt = new Date(Number(postAt));
+    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string) : ChatPostEphemeralArguments {
+        let postDt = new Date(postAt);
         const msg = "Your status is scheduled to send\n "
             + postDt.toLocaleDateString()
         + " at " + postDt.toLocaleTimeString();
