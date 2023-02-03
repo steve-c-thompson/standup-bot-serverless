@@ -1,6 +1,7 @@
-import {UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
-import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock, ViewOutput} from "@slack/bolt";
+import {KnownBlock, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
+import {Block, ContextBlock, HeaderBlock, Logger, Option, SectionBlock, ViewOutput} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+import {StandupInputData} from "./SlackBot";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -8,10 +9,64 @@ export class ParkingLotDisplayItem {
     attendeeIds: string[]
 }
 
+export const messageTypePost = "post";
+export const messageTypeDisplay = "display";
+
 export class BotViewBuilder {
 
     private SHORTCUT_STORY_URL = "https://app.shortcut.com/homebound-team/story/";
     private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
+    private postOption: Option = {
+        "text": {
+            "type": "mrkdwn",
+            "text": "Post to channel"
+        },
+        "value": messageTypePost,
+        "description": {
+            "type": "plain_text",
+            "text": "This will post in the channel immediately."
+        }
+    };
+
+    private postToChannelSection: KnownBlock[] = [
+        {
+            type: "section",
+            block_id: "message-type",
+            text: {
+                type: "mrkdwn",
+                text: "You may post status to the channel or create a message visible only to you."
+            },
+            accessory: {
+                type: "radio_buttons",
+                action_id: "message-type-action",
+                initial_option: this.postOption,
+                options: [
+                    this.postOption,
+                    {
+                        text: {
+                            type: "mrkdwn",
+                            text: "Display only",
+                        },
+                        value: messageTypeDisplay,
+                        description: {
+                            type: "plain_text",
+                            text: "This will display only to you. You must post your status manually."
+                        }
+
+                    }
+                ]
+            }
+        },
+        {
+            type: "context",
+            elements: [
+                {
+                    type: "mrkdwn",
+                    text: "Displaying status will allow you to schedule or edit the message, but any *Parking Lot* items will not be tracked for display with the `parking-lot` option."
+                        + "\n\nSee `standup /help` for more information.",
+                },
+            ]
+        }];
 
     /**
      *
@@ -19,7 +74,8 @@ export class BotViewBuilder {
      * @param pm
      */
     public buildModalInputView(trigger_id: string, pm: PrivateMetadata): ViewsOpenArguments {
-        return {
+
+        let args: ViewsOpenArguments = {
             trigger_id: trigger_id,
             // View payload
             view: {
@@ -40,7 +96,7 @@ export class BotViewBuilder {
                             {
                                 "type": "mrkdwn",
                                 "text": "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
-                            }
+                            },
                         ]
                     },
                     {
@@ -148,9 +204,12 @@ export class BotViewBuilder {
 
             }
         };
+        // add the post section as the last set of blocks
+        args.view.blocks.push(...this.postToChannelSection);
+        return args;
     }
 
-    public async buildOutputBlocks(userInfoMsg: string,
+    public buildOutputBlocks(userInfoMsg: string,
                                     yesterday: string, today: string,
                                     parkingLotItems: string | null | undefined,
                                     pullRequests: string | null | undefined,
@@ -268,10 +327,9 @@ export class BotViewBuilder {
         };
     }
 
-    public async createChatMessageEditDisclaimer(view: ViewOutput): Promise<ChatPostEphemeralArguments> {
-        const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
-        const channelId = pm.channelId!;
-        const userId = pm.userId!;
+    public createChatMessageEditDisclaimer(viewInput: StandupInputData): ChatPostEphemeralArguments {
+        const channelId = viewInput.pm.channelId!;
+        const userId = viewInput.pm.userId!;
 
         const blocks = [];
         const msg = "You cannot edit your standup post. Add any updates in its thread :thread:"
@@ -285,7 +343,7 @@ export class BotViewBuilder {
     }
 
     public buildParkingLotDisplayItems(pItems: ParkingLotDisplayItem[]): string {
-        if(pItems.length > 0) {
+        if (pItems.length > 0) {
             let out = pItems.map(i => {
                 // for each attendee, use their given id
                 let attendeeList = i.attendeeIds!.map(a => {

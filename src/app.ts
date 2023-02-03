@@ -4,6 +4,8 @@ import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
+import {messageTypePost} from "./bot/BotViewBuilder";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -82,17 +84,28 @@ const init = async () => {
 
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
         logger.debug("Handling standup-view submit");
-        let chatPostMessageArguments = await slackBot.createAndHandleChatMessageFromViewOutput(view, client, logger);
+        const viewInput = slackBot.getViewInputValues(view);
+        let chatMessageArgs = await slackBot.createChatMessageFromViewOutputAndSaveData(viewInput, client, logger);
         try {
-            await client.chat.postMessage(chatPostMessageArguments);
-            await ack();
-            const disclaimer = await slackBot.createChatMessageEditDisclaimer(view);
-            await client.chat.postEphemeral(disclaimer);
+            console.log("message type " + viewInput.messageType);
+            if(viewInput.messageType === messageTypePost) {
+                console.log("post");
+                await client.chat.postMessage(chatMessageArgs);
+                await ack();
+                const disclaimer = slackBot.createChatMessageEditDisclaimer(viewInput);
+                console.log("disclaimer " + disclaimer);
+                await client.chat.postEphemeral(disclaimer);
+            }
+            else {
+                console.log("display");
+                await client.chat.postEphemeral(chatMessageArgs as ChatPostEphemeralArguments);
+                await ack();
+            }
         } catch (error) {
             logger.error(error);
             let msg = (error as Error).message;
             if (msg.includes("not_in_channel")) {
-                msg = ":x: Standup is a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
+                msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
                     "`@Standup`."
             }
             const viewArgs: ModalView = {

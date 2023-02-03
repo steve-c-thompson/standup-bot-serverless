@@ -2,13 +2,23 @@ import {Logger, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
 import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
-import {BotViewBuilder, ParkingLotDisplayItem} from "./BotViewBuilder";
+import {BotViewBuilder, messageTypeDisplay, ParkingLotDisplayItem} from "./BotViewBuilder";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+
+export class StandupInputData {
+    pm: PrivateMetadata
+    yesterday: string
+    today: string
+    parkingLot: string | null | undefined
+    attendees: string[] = []
+    pullRequests: string | null | undefined
+    messageType: string
+}
 
 export class SlackBot {
     private dao: StandupParkingLotDataDao;
 
     private viewBuilder = new BotViewBuilder();
-
 
     constructor(dao: StandupParkingLotDataDao) {
         this.dao = dao;
@@ -51,15 +61,8 @@ export class SlackBot {
         return memberIds;
     }
 
-    public async createAndHandleChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
-        // channel_id and maybe user_id stored from submit
+    public getViewInputValues(view: ViewOutput): StandupInputData {
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
-        const channelId = pm.channelId!;
-        const userId = pm.userId!;
-
-        const userInfo = await this.queryUser(userId, client);
-
-        const userInfoMsg = userInfo.user?.real_name!;
 
         // Yesterday
         let yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
@@ -76,15 +79,38 @@ export class SlackBot {
         let pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
         const attendees = selectedMemberIds.selected_users!;
+        // Message type
+        let msgType = view['state']['values']['message-type']['message-type-action']['selected_option']!.value;
+
+        return {
+            pm: pm,
+            yesterday: yesterday,
+            today: today,
+            parkingLot: parkingLot,
+            attendees: attendees,
+            pullRequests: pullRequests,
+            messageType: msgType
+        }
+    }
+    public async createChatMessageFromViewOutputAndSaveData(viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatPostEphemeralArguments> {
+        // channel_id and maybe user_id stored from submit
+        const channelId = viewInput.pm.channelId!;
+        const userId = viewInput.pm.userId!;
+
+        const userInfo = await this.queryUser(userId, client);
+
+        const userInfoMsg = userInfo.user?.real_name!;
+
+
         let memberInfos: UsersInfoResponse[] = [];
-        if (attendees.length > 0) {
-            memberInfos = await this.queryUsers(attendees, client);
+        if (viewInput.attendees.length > 0) {
+            memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = await this.viewBuilder.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
+        const blocks = this.viewBuilder.buildOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
-            await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+            await this.saveParkingLotData(channelId, new Date(), userId, viewInput.parkingLot, memberInfos);
         } catch (e) {
             logger.error(e);
         }
@@ -98,7 +124,8 @@ export class SlackBot {
             text: userInfoMsg,
             mrkdwn: true,
             unfurl_links: false,
-            unfurl_media: false
+            unfurl_media: false,
+            user: userId
         };
     }
 
@@ -248,7 +275,7 @@ export class SlackBot {
         return allMembers.members;
     }
 
-    public async createChatMessageEditDisclaimer(view: ViewOutput) {
-        return this.viewBuilder.createChatMessageEditDisclaimer(view);
+    public createChatMessageEditDisclaimer(viewInput: StandupInputData) {
+        return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
 }
