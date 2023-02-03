@@ -6,6 +6,11 @@ import {StandupParkingLotData} from "./StandupParkingLotData";
 describe(standupParkingLotTableName, () => {
     const dao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
 
+    const jan1Zero = new Date(jan1.getTime());
+    jan1Zero.setUTCHours(0, 0, 0, 0);
+    const jan2Zero = new Date(jan2.getTime());
+    jan2Zero.setUTCHours(0, 0, 0, 0);
+
     describe('should retrieve', () => {
         it("an existing entity", async () => {
             let r = await dao.getChannelParkingLotDataForDate("ABC", jan1);
@@ -15,6 +20,13 @@ describe(standupParkingLotTableName, () => {
             expect(r?.updatedAt).toBeTruthy();
             expect(r?.channelId).toBeTruthy();
             expect(r?.timeToLive).toBeTruthy();
+            expect(r?.parkingLotData).toHaveLength(2);
+        });
+        it("an existing entity with ttl day plus one", async () => {
+            let r = await dao.getChannelParkingLotDataForDate("ABC", jan1);
+            expect(r).toBeTruthy();
+            expect(r?.channelId).toEqual("ABC");
+            expect(r?.timeToLive).toEqual(jan2Zero);
             expect(r?.parkingLotData).toHaveLength(2);
         });
         it("null if no data for that Year Month Day", async () => {
@@ -34,7 +46,7 @@ describe(standupParkingLotTableName, () => {
                 expect(d?.createdAt).toBeTruthy();
                 expect(d?.updatedAt).toBeTruthy();
                 expect(d?.timeToLive).toBeTruthy();
-                expect(d?.timeToLive?.getTime()).toBeGreaterThan(d.createdAt?.getTime()!);
+                expect(d?.timeToLive?.getTime()).toBeGreaterThan(d.standupDate?.getTime()!);
                 await dbCleanup();
             });
             it('and zero out standupDate', async () => {
@@ -101,7 +113,9 @@ describe(standupParkingLotTableName, () => {
         const jan1Zero = new Date(jan1.getTime());
         jan1Zero.setUTCHours(0, 0, 0, 0);
         expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
-        expect(d?.timeToLive?.getTime()).toBeGreaterThan(d?.createdAt?.getTime()!);
+        expect(d?.timeToLive?.getTime()).toBeGreaterThan(d?.standupDate?.getTime()!);
+
+        await dbCleanup();
     });
 
     describe("upsert",  () => {
@@ -127,10 +141,8 @@ describe(standupParkingLotTableName, () => {
                 testParkingLotData.parkingLotData![1]
             ]));
             expect(d?.createdAt).toBeTruthy();
-            const jan1Zero = new Date(jan1.getTime());
-            jan1Zero.setUTCHours(0, 0, 0, 0);
             expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
-            expect(d?.timeToLive?.getTime()).toBeGreaterThan(d?.createdAt?.getTime()!);
+            expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
             await dbCleanup();
         }),
         it("should insert new", async () => {
@@ -155,10 +167,8 @@ describe(standupParkingLotTableName, () => {
                 testParkingLotData.parkingLotData![1]
             ]));
             expect(d?.createdAt).toBeTruthy();
-            const jan1Zero = new Date(jan1.getTime());
-            jan1Zero.setUTCHours(0, 0, 0, 0);
             expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
-            expect(d?.timeToLive?.getTime()).toBeGreaterThan(d?.createdAt?.getTime()!);
+            expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
             await dbCleanup();
         }),
             it("should return null when there are no parking lot items and no attendees", async () => {

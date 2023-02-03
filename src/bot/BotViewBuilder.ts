@@ -223,7 +223,7 @@ export class BotViewBuilder {
 
     public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string) : ChatPostEphemeralArguments {
         let postDt = new Date(postAt);
-        const msg = "Your status is scheduled to send\n "
+        const msg = "Your status is scheduled to send on\n "
             + postDt.toLocaleDateString()
         + " at " + postDt.toLocaleTimeString();
 
