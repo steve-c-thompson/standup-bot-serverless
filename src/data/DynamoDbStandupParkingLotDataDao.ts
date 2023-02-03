@@ -27,6 +27,7 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
 
     async putStandupParkingLotData(data: StandupParkingLotData): Promise<StandupParkingLotData> {
         this.validateAndSetStandupDate(data);
+        this.validateAndSetTtl(data);
         logger.debug("Storing standup data " + data.channelId + " with date " + data.standupDate?.getTime());
         return this.mapper.put(data);
     }
@@ -117,6 +118,13 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
         data.standupDate = DynamoDbStandupParkingLotDataDao.createZeroUtcDate(data.standupDate);
     }
 
+    private validateAndSetTtl(data: StandupParkingLotData) {
+        if(!data.timeToLive) {
+            data.timeToLive = new Date(data.standupDate!);
+            data.timeToLive.setDate(data.standupDate!.getDate() + 1);
+        }
+    }
+
     private static createZeroUtcDate(date: Date): Date {
         const d = new Date(date.getTime());
         d.setUTCHours(0, 0, 0, 0);
@@ -134,6 +142,9 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
         data.channelId = channelId;
         data.parkingLotData = parkingLotData;
         data.standupDate = this.createZeroUtcDate(date);
+        const ttl = new Date(data.standupDate);
+        ttl.setDate(ttl.getDate() + 1);
+        data.timeToLive = ttl;
         return data;
     }
 }

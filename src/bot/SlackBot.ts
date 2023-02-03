@@ -121,7 +121,8 @@ export class SlackBot {
         const blocks = this.viewBuilder.buildChatMessageOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
-            await this.saveParkingLotData(channelId, new Date(), userId, viewInput.parkingLot, memberInfos);
+            const saveDate = viewInput.scheduleDateTime ? new Date(viewInput.scheduleDateTime) : new Date();
+            await this.saveParkingLotData(channelId, saveDate, userId, viewInput.parkingLot, memberInfos);
         } catch (e) {
             logger.error(e);
         }
