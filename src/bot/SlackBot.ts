@@ -1,15 +1,24 @@
-import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock, SlashCommand, ViewOutput} from "@slack/bolt";
+import {Logger, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, UsersInfoResponse, ViewsOpenArguments, WebClient} from "@slack/web-api";
-import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
+import {BotViewBuilder, messageTypeDisplay, ParkingLotDisplayItem} from "./BotViewBuilder";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+
+export class StandupInputData {
+    pm: PrivateMetadata
+    yesterday: string
+    today: string
+    parkingLot: string | null | undefined
+    attendees: string[] = []
+    pullRequests: string | null | undefined
+    messageType: string
+}
 
 export class SlackBot {
-
-    private SHORTCUT_STORY_URL = "https://app.shortcut.com/homebound-team/story/";
     private dao: StandupParkingLotDataDao;
 
-    private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
+    private viewBuilder = new BotViewBuilder();
 
     constructor(dao: StandupParkingLotDataDao) {
         this.dao = dao;
@@ -18,10 +27,9 @@ export class SlackBot {
     /**
      * Create the initial modal view. block_id and action_id are hardcoded.
      * @param body
-     * @param client
      * @param logger
      */
-    public async buildModalView(body: SlashCommand, client: WebClient, logger: Logger): Promise<ViewsOpenArguments> {
+    public buildModalView(body: SlashCommand, logger: Logger): ViewsOpenArguments {
         const channelId = body.channel_id;
 
         // let memberIds = await this.loadMemberIdsForModal(channelId, logger, client, body);
@@ -31,135 +39,9 @@ export class SlackBot {
             userId: body.user_id
         };
 
-        return {
-            trigger_id: body.trigger_id,
-            // View payload
-            view: {
-                type: 'modal',
-                // View identifier
-                callback_id: 'standup_view',
-                clear_on_close: true,
-                // Save the channel ID and user ID for subsequent interactions
-                private_metadata: JSON.stringify(pm),
-                title: {
-                    type: 'plain_text',
-                    text: 'Async Standup Status'
-                },
-                blocks: [
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    },
-                    {
-                        type: "input",
-                        block_id: "yesterday",
-                        element: {
-                            type: "plain_text_input",
-                            multiline: true,
-                            action_id: "yesterday-action",
-                            focus_on_load: true,
-                            placeholder: {
-                                type: "plain_text",
-                                text: "What you did yesterday"
-                            }
-                        },
-                        label: {
-                            type: "plain_text",
-                            text: "Yesterday",
-                            emoji: true
-                        }
-                    },
-                    {
-                        type: "input",
-                        block_id: "today",
-                        element: {
-                            type: "plain_text_input",
-                            multiline: true,
-                            action_id: "today-action",
-                            placeholder: {
-                                type: "plain_text",
-                                text: "What you will do today"
-                            }
-                        },
-                        label: {
-                            type: "plain_text",
-                            text: "Today",
-                            emoji: true
-                        }
-                    },
-                    {
-                        type: "input",
-                        block_id: "parking-lot",
-                        optional: true,
-                        element: {
-                            type: "plain_text_input",
-                            multiline: true,
-                            action_id: "parking-lot-action",
-                            placeholder: {
-                                type: "plain_text",
-                                text: "Parking Lot items to discuss"
-                            }
-                        },
-                        label: {
-                            type: "plain_text",
-                            text: "Parking Lot Items",
-                            emoji: true
-                        }
-                    },
-                    {
-                        type: "input",
-                        optional: true,
-                        block_id: "parking-lot-participants",
-                        element: {
-                            type: "multi_users_select",
-                            placeholder: {
-                                type: "plain_text",
-                                text: "Select teammates",
-                                emoji: true,
-                            },
-                            action_id: "parking-lot-participants-action"
-                        },
-                        label: {
-                            type: "plain_text",
-                            text: "Parking Lot Participants",
-                            emoji: true
-                        }
-                    },
-                    {
-                        type: "input",
-                        block_id: "pull-requests",
-                        optional: true,
-                        element: {
-                            type: "plain_text_input",
-                            multiline: true,
-                            action_id: "pull-requests-action",
-                            placeholder: {
-                                type: "plain_text",
-                                text: "PRs you need reviewed"
-                            }
-                        },
-                        label: {
-                            type: "plain_text",
-                            text: "Pull Requests for Review",
-                            emoji: true
-                        }
-                    },
-                ],
-                submit: {
-                    type: 'plain_text',
-                    text: 'Submit'
-                }
+        const trigger_id = body.trigger_id;
 
-            }
-        };
+        return this.viewBuilder.buildModalInputView(trigger_id, pm);
     }
 
     /**
@@ -179,15 +61,8 @@ export class SlackBot {
         return memberIds;
     }
 
-    public async createAndHandleChatMessageFromViewOutput(view: ViewOutput, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments> {
-        // channel_id and maybe user_id stored from submit
+    public getViewInputValues(view: ViewOutput): StandupInputData {
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
-        const channelId = pm.channelId!;
-        const userId = pm.userId!;
-
-        const userInfo = await this.queryUser(userId, client);
-
-        const userInfoMsg = userInfo.user?.real_name!;
 
         // Yesterday
         let yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
@@ -204,29 +79,38 @@ export class SlackBot {
         let pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
         const attendees = selectedMemberIds.selected_users!;
+        // Message type
+        let msgType = view['state']['values']['message-type']['message-type-action']['selected_option']!.value;
+
+        return {
+            pm: pm,
+            yesterday: yesterday,
+            today: today,
+            parkingLot: parkingLot,
+            attendees: attendees,
+            pullRequests: pullRequests,
+            messageType: msgType
+        }
+    }
+    public async createChatMessageFromViewOutputAndSaveData(viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatPostEphemeralArguments> {
+        // channel_id and maybe user_id stored from submit
+        const channelId = viewInput.pm.channelId!;
+        const userId = viewInput.pm.userId!;
+
+        const userInfo = await this.queryUser(userId, client);
+
+        const userInfoMsg = userInfo.user?.real_name!;
+
+
         let memberInfos: UsersInfoResponse[] = [];
-        if (attendees.length > 0) {
-            memberInfos = await this.queryUsers(attendees, client);
+        if (viewInput.attendees.length > 0) {
+            memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        yesterday = this.formatTextNumbersToStories(yesterday);
-
-        today = this.formatTextNumbersToStories(today);
-
-        if(parkingLot)
-        {
-            parkingLot = this.formatTextNumbersToStories(parkingLot);
-        }
-
-        if(pullRequests)
-        {
-            pullRequests = this.formatTextNumbersToStories(pullRequests);
-        }
-
-        const blocks = await this.buildOutputBlocks(userInfoMsg, yesterday, today, parkingLot, pullRequests, memberInfos, logger);
+        const blocks = this.viewBuilder.buildOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
-            await this.saveParkingLotData(channelId, new Date(), userId, parkingLot, memberInfos);
+            await this.saveParkingLotData(channelId, new Date(), userId, viewInput.parkingLot, memberInfos);
         } catch (e) {
             logger.error(e);
         }
@@ -240,40 +124,26 @@ export class SlackBot {
             text: userInfoMsg,
             mrkdwn: true,
             unfurl_links: false,
-            unfurl_media: false
+            unfurl_media: false,
+            user: userId
         };
-    }
-
-    public async createChatMessageEditDisclaimer(view: ViewOutput): Promise<ChatPostEphemeralArguments> {
-        const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
-        const channelId = pm.channelId!;
-        const userId = pm.userId!;
-
-        const blocks = [];
-        const msg = "You cannot edit your standup post. Add any updates in its thread :thread:"
-        blocks.push(this.buildEditDisclaimerBlock(msg));
-        return {
-            channel: channelId,
-            user: userId,
-            blocks: blocks,
-            text: msg
-        }
     }
 
     public async buildParkingLotDisplayData(channelId: string, date: Date, client: WebClient): Promise<string> {
         let p: StandupParkingLotData | null = await this.dao.getChannelParkingLotDataForDate(channelId, date);
+        let displayItems: ParkingLotDisplayItem[] = [];
         if (p) {
-            let proms = await p.parkingLotData!.map(async i => {
+            let proms = p.parkingLotData!.map(async i => {
+                let item = new ParkingLotDisplayItem();
                 let u = await this.queryUser(i.userId, client);
-                let attendeeList = i.attendees!.map(a => {
-                    return this.atMember(a);
-                }).join(", ");
-                return "*" + u.user?.real_name + "*\n" + i.content + "\n*Attendees*: " + attendeeList;
-            }).flat();
-            let out = await Promise.all(proms);
-            return out.join("\n");
+                item.userName = u.user?.real_name!;
+                item.attendeeIds = i.attendees? i.attendees : [];
+                item.content = i.content;
+                return item;
+            });
+            displayItems = await Promise.all(proms);
         }
-        return "No parking lot items today";
+        return this.viewBuilder.buildParkingLotDisplayItems(displayItems);
     }
 
     public async saveParkingLotData(channelId: string,
@@ -325,105 +195,6 @@ export class SlackBot {
                 await this.dao.putStandupParkingLotData(d);
             }
         }
-    }
-
-    private async buildOutputBlocks(userInfoMsg: string,
-                                    yesterday: string, today: string,
-                                    parkingLotItems: string | null | undefined,
-                                    pullRequests: string | null | undefined,
-                                    parkingLotAttendees: UsersInfoResponse[],
-                                    logger: Logger) {
-        const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
-            {
-                type: "header",
-                text: {
-                    type: "plain_text",
-                    text: userInfoMsg + " :speaking_head_in_silhouette:",
-                }
-            },
-            {
-                type: "section",
-                text: {
-                    type: "mrkdwn",
-                    text: ":rewind: *Yesterday*\n" + yesterday
-                }
-            },
-            {
-                type: "section",
-                text: {
-                    type: "mrkdwn",
-                    text: ":arrow_forward: *Today*\n" + today
-                }
-            }
-        ];
-
-        if (pullRequests) {
-            blocks.push(
-                {
-                    type: "section",
-                    text: {
-                        type: "mrkdwn",
-                        text: ":computer: *Pull Requests for Review*\n" + pullRequests
-                    }
-                }
-            );
-        }
-
-        if (parkingLotItems) {
-            blocks.push(
-                {
-                    type: "section",
-                    text: {
-                        type: "mrkdwn",
-                        text: ":car: *Parking Lot Items*\n" + parkingLotItems
-                    }
-                }
-            );
-        }
-        if (parkingLotAttendees.length > 0) {
-            try {
-                // Text output
-                const memberOutput = this.formatMembersForOutput(parkingLotAttendees, " ") + "\n";
-                const context: ContextBlock = {
-                    type: "context",
-                    elements: []
-                };
-                parkingLotAttendees.forEach(m => {
-                    context.elements.push(
-                        {
-                            type: "image",
-                            image_url: m.user!.profile!.image_72!,
-                            alt_text: m.user!.real_name!
-                        }
-                    );
-                });
-
-                blocks.push({
-                        type: "section",
-                        text: {
-                            type: "mrkdwn",
-                            text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
-                        }
-                    },
-                    context
-                );
-
-            } catch (e) {
-                logger.error(e);
-            }
-        }
-
-        return blocks;
-    }
-
-    private buildEditDisclaimerBlock(msg: string) {
-        return {
-            type: "context",
-            elements: [{
-                type: "mrkdwn",
-                text: msg
-            }]
-        };
     }
 
     private async queryUsers(users: string[], client: WebClient) {
@@ -504,27 +275,7 @@ export class SlackBot {
         return allMembers.members;
     }
 
-    /**
-     * Use each UsersInfoResponse to output an image and name
-     * @param memberInfos
-     * @param divider
-     * @private
-     */
-    private formatMembersForOutput(memberInfos: UsersInfoResponse[], divider: string): string {
-        let formatted = "";
-        memberInfos.forEach((m, index) => {
-            formatted += this.atMember(m.user?.id!) + divider;
-        });
-
-        return formatted.toString();
+    public createChatMessageEditDisclaimer(viewInput: StandupInputData) {
+        return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
-
-    private atMember(id: string) {
-        return "<@" + id + ">";
-    }
-
-    private formatTextNumbersToStories(content: string) {
-        return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$1" + "|$1>");
-    }
-
 }
