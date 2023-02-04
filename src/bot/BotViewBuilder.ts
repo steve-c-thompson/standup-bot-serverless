@@ -1,7 +1,8 @@
-import {ChatScheduleMessageArguments, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
+import {ChatScheduleMessageArguments, ViewsOpenArguments} from "@slack/web-api";
 import {Block, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {ChatMessageType, StandupInputData, UserInfo} from "./SlackBot";
+import {formatDateToMoment} from "../utils/datefunctions";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -46,7 +47,7 @@ export class BotViewBuilder {
      * @param trigger_id
      * @param pm
      */
-    public buildModalInputView(trigger_id: string, pm: PrivateMetadata): ViewsOpenArguments {
+    public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo): ViewsOpenArguments {
 
         // const date = this.buildInitialScheduleDate();
         let args: ViewsOpenArguments = {
@@ -181,7 +182,7 @@ export class BotViewBuilder {
                         element:
                             {
                                 type: "datepicker",
-                                action_id: "schedule-date-action"
+                                action_id: "schedule-date-action",
                             },
                     },
                     {
@@ -191,7 +192,8 @@ export class BotViewBuilder {
                         element:
                             {
                                 type: "timepicker",
-                                action_id: "schedule-time-action"
+                                action_id: "schedule-time-action",
+                                timezone: userInfo.timezone
                             },
                         label: {
                             type: "plain_text",
@@ -231,13 +233,12 @@ export class BotViewBuilder {
      * @param channelId
      * @param postAt
      * @param userId
+     * @param timezone
      * @param args
      */
-    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
-        let postDt = new Date(postAt);
-        const msg = "Your status below is scheduled to send on\n "
-            + postDt.toLocaleDateString()
-            + " at " + postDt.toLocaleTimeString();
+    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
+        const dateStr = formatDateToMoment(postAt, timezone);
+        const msg = "Your status below is scheduled to send on\n " + dateStr;
 
         const cmd = new DeleteCommand(msgId, channelId, postAt, userId);
         const body: ChatPostEphemeralArguments = {
