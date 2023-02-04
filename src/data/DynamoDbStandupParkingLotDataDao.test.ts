@@ -3,7 +3,16 @@ import {context, standupParkingLotTableName} from "../utils/context";
 import {dbCleanup, jan1, jan2, testParkingLotData} from "../test/scripts/create-dynamodb";
 import {StandupParkingLotData} from "./StandupParkingLotData";
 
-describe(standupParkingLotTableName, () => {
+// Make sure the database is in an acceptable state
+beforeEach(async () => {
+    await dbCleanup();
+});
+
+// Now leave it how we found it
+afterAll( async () => {
+    await dbCleanup();
+})
+describe(DynamoDbStandupParkingLotDataDao.name, () => {
     const dao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
 
     const jan1Zero = new Date(jan1.getTime());
@@ -35,7 +44,7 @@ describe(standupParkingLotTableName, () => {
         })
     });
 
-    describe("it should update", () => {
+    describe("should update", () => {
             it('an existing data without overwriting missing data', async () => {
                 let d = new StandupParkingLotData();
                 d.channelId = "ABC";
@@ -47,7 +56,6 @@ describe(standupParkingLotTableName, () => {
                 expect(d?.updatedAt).toBeTruthy();
                 expect(d?.timeToLive).toBeTruthy();
                 expect(d?.timeToLive?.getTime()).toBeGreaterThan(d.standupDate?.getTime()!);
-                await dbCleanup();
             });
             it('and zero out standupDate', async () => {
                 let d = DynamoDbStandupParkingLotDataDao.standupParkingLotDataObjectFactory("ABC", jan1, []);
@@ -58,7 +66,6 @@ describe(standupParkingLotTableName, () => {
                 expect(d?.standupDate?.getUTCDay()).toEqual(standupDate.getUTCDay());
                 expect(d?.standupDate?.getUTCHours()).toEqual(0);
                 expect(d?.standupDate?.getUTCMinutes()).toEqual(0);
-                await dbCleanup();
             });
 
             it('fields including updatedAt but not createdAt or timeToLive', async () => {
@@ -83,7 +90,6 @@ describe(standupParkingLotTableName, () => {
                 expect(d?.createdAt).toEqual(createdAt);
                 expect(d?.updatedAt?.getTime()).toBeGreaterThan(createdAt.getTime());
                 expect(d?.timeToLive).toEqual(ttl);
-                await dbCleanup();
             });
         }
     );
@@ -114,75 +120,72 @@ describe(standupParkingLotTableName, () => {
         jan1Zero.setUTCHours(0, 0, 0, 0);
         expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
         expect(d?.timeToLive?.getTime()).toBeGreaterThan(d?.standupDate?.getTime()!);
-
-        await dbCleanup();
     });
 
-    describe("upsert",  () => {
-        it('should update existing', async () => {
-            let d: StandupParkingLotData | null = null;
-
-            try {
-                d = await dao.upsertStandupParkingLotData("ABC", jan1, "Ricky",
-                    "items", [
-                        "Mike",
-                        "Mark"
-                    ]);
-            } catch (e) {
-                console.log(e);
-            }
-            expect(d?.channelId).toEqual("ABC");
-            // also has existing
-            expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
-                userId: "Ricky",
-                content: "items",
-                attendees: ["Mike", "Mark"]
-            },
-                testParkingLotData.parkingLotData![1]
-            ]));
-            expect(d?.createdAt).toBeTruthy();
-            expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
-            expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
-            await dbCleanup();
-        }),
-        it("should insert new", async () => {
-            let d: StandupParkingLotData | null = null;
-
-            try {
-                d = await dao.upsertStandupParkingLotData("ABC", jan1, "Bobby",
-                    "things", [
-                        "Dave",
-                        "Donna"
-                    ]);
-            } catch (e) {
-                console.log(e);
-            }
-            expect(d?.channelId).toEqual("ABC");
-            expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
-                    userId: "Bobby",
-                    content: "things",
-                    attendees: ["Dave", "Donna"]
-                },
-                testParkingLotData.parkingLotData![0],
-                testParkingLotData.parkingLotData![1]
-            ]));
-            expect(d?.createdAt).toBeTruthy();
-            expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
-            expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
-            await dbCleanup();
-        }),
-            it("should return null when there are no parking lot items and no attendees", async () => {
+    describe("upsert",
+        () => {
+            it('should update existing', async () => {
                 let d: StandupParkingLotData | null = null;
 
                 try {
-                    d = await dao.upsertStandupParkingLotData("ABC", jan1, "XXX",
-                        null, []);
+                    d = await dao.upsertStandupParkingLotData("ABC", jan1, "Ricky",
+                        "items", [
+                            "Mike",
+                            "Mark"
+                        ]);
                 } catch (e) {
                     console.log(e);
                 }
-                expect(d).toBeNull();
-            })
-    });
+                expect(d?.channelId).toEqual("ABC");
+                // also has existing
+                expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
+                    userId: "Ricky",
+                    content: "items",
+                    attendees: ["Mike", "Mark"]
+                },
+                    testParkingLotData.parkingLotData![1]
+                ]));
+                expect(d?.createdAt).toBeTruthy();
+                expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
+                expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
+            }),
+                it("should insert new", async () => {
+                    let d: StandupParkingLotData | null = null;
+
+                    try {
+                        d = await dao.upsertStandupParkingLotData("ABC", jan1, "Bobby",
+                            "things", [
+                                "Dave",
+                                "Donna"
+                            ]);
+                    } catch (e) {
+                        console.log(e);
+                    }
+                    expect(d?.channelId).toEqual("ABC");
+                    expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
+                        userId: "Bobby",
+                        content: "things",
+                        attendees: ["Dave", "Donna"]
+                    },
+                        testParkingLotData.parkingLotData![0],
+                        testParkingLotData.parkingLotData![1]
+                    ]));
+                    expect(d?.createdAt).toBeTruthy();
+                    expect(d?.standupDate?.getTime()).toEqual(jan1Zero.getTime());
+                    expect(d?.timeToLive?.getTime()).toEqual(jan2Zero.getTime());
+                }),
+                it("should return null when there are no parking lot items and no attendees", async () => {
+                    let d: StandupParkingLotData | null = null;
+
+                    try {
+                        d = await dao.upsertStandupParkingLotData("ABC", jan1, "XXX",
+                            null, []);
+                    } catch (e) {
+                        console.log(e);
+                    }
+                    expect(d).toBeNull();
+                })
+        });
 
     describe("remove",  () => {
         it('should remove existing and return object', async () => {
