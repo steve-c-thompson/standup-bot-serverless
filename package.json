@@ -63,6 +63,8 @@
     "@types/cross-spawn": "^6.0.2",
     "@types/jest": "^29.4.0",
     "dotenv": "^16.0.3",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.40",
     "readme-md-generator": "^1.0.0",
     "ts-jest": "^29.0.5",
     "ts-loader": "^9.4.2",

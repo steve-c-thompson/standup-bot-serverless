@@ -6,6 +6,7 @@ import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
 import {ChatScheduleMessageArguments} from "@slack/web-api";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+import {formatDateToMoment} from "./utils/datefunctions";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -71,7 +72,7 @@ const init = async () => {
         }
         else {
             try {
-                let payload = slackBot.buildModalView(body, logger);
+                let payload = await slackBot.buildModalView(body, client, logger);
                 const result = await client.views.open(
                     payload
                 );
@@ -87,14 +88,21 @@ const init = async () => {
         const viewInput = slackBot.getViewInputValues(view);
         try {
             if(viewInput.scheduleDateTime) {
+                // locale info for printing
+                const localeInfo = ["en-US", { timeZone: viewInput.timezone!}];
+                let scheduleStr = formatDateToMoment(viewInput.scheduleDateTime, viewInput.timezone!);
                 const chatMessageArgs = await slackBot.createChatMessageAndSaveData("scheduled", viewInput, client, logger);
+                const toSchedule = new Date(viewInput.scheduleDateTime);
+                // @ts-ignore
+                console.log("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
                 // Try to schedule before ack() in case there is an error
                 let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
                 await ack();
                 const date = new Date(scheduleResponse.post_at! * 1000);
-                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send at ${date.toLocaleDateString()} ${date.toLocaleTimeString()} for channel ${scheduleResponse.channel} `);
+                // @ts-ignore
+                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToMoment(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
 
                 // Use the response to create a dialog
                 let msgId = scheduleResponse.scheduled_message_id!;
@@ -102,6 +110,7 @@ const init = async () => {
                     viewInput.pm.channelId!,
                     viewInput.scheduleDateTime,
                     viewInput.pm.userId!,
+                    viewInput.timezone!,
                     chatMessageArgs as ChatScheduleMessageArguments);
 
                 await client.chat.postEphemeral(confMessage);

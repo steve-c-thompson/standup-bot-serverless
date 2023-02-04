@@ -1,16 +1,10 @@
 import {BlockAction, ButtonAction, Logger, ModalView, SlashCommand, ViewOutput} from "@slack/bolt";
-import {
-    ChatDeleteScheduledMessageResponse,
-    ChatPostMessageArguments,
-    ChatScheduleMessageArguments,
-    UsersInfoResponse,
-    ViewsOpenArguments,
-    WebClient
-} from "@slack/web-api";
+import {ChatPostMessageArguments, ChatScheduleMessageArguments, ViewsOpenArguments, WebClient} from "@slack/web-api";
 import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
 import {BotViewBuilder, DeleteCommand, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
+import {adjustDateAndTimeForTimezone} from "../utils/datefunctions";
 
 export class StandupInputData {
     pm: PrivateMetadata
@@ -20,12 +14,14 @@ export class StandupInputData {
     attendees: string[] = []
     pullRequests?: string | null | undefined
     scheduleDateTime?: number | null | undefined
+    timezone?: string
 }
 
 export class UserInfo {
     name: string
     userId: string
     img?: string
+    timezone: string
 }
 
 export type ChatMessageType = "scheduled" | "post" | "ephemeral";
@@ -42,9 +38,10 @@ export class SlackBot {
     /**
      * Create the initial modal view. block_id and action_id are hardcoded.
      * @param body
+     * @param client
      * @param logger
      */
-    public buildModalView(body: SlashCommand, logger: Logger): ViewsOpenArguments {
+    public async buildModalView(body: SlashCommand, client:WebClient, logger: Logger): Promise<ViewsOpenArguments> {
         const channelId = body.channel_id;
 
         const pm: PrivateMetadata = {
@@ -52,9 +49,11 @@ export class SlackBot {
             userId: body.user_id
         };
 
+        const userInfo = await this.queryUser(body.user_id, client);
+
         const trigger_id = body.trigger_id;
 
-        return this.viewBuilder.buildModalInputView(trigger_id, pm);
+        return this.viewBuilder.buildModalInputView(trigger_id, pm, userInfo);
     }
 
     /**
@@ -65,26 +64,28 @@ export class SlackBot {
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
 
         // Yesterday
-        let yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
+        const yesterday = view['state']['values']['yesterday']['yesterday-action'].value!;
         // Today
-        let today = view['state']['values']['today']['today-action'].value!;
+        const today = view['state']['values']['today']['today-action'].value!;
         // Parking Lot
-        let parkingLot = view['state']['values']['parking-lot']['parking-lot-action'].value;
+        const parkingLot = view['state']['values']['parking-lot']['parking-lot-action'].value;
 
         // Parking Lot Attendees
         // Get list of selected members
         const selectedMemberIds = view['state']['values']['parking-lot-participants']['parking-lot-participants-action'];
 
         // Pull Requests
-        let pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
+        const pullRequests = view['state']['values']['pull-requests']['pull-requests-action'].value;
 
-        let dateStr = view['state']['values']['schedule-date']['schedule-date-action']['selected_date'];
-        let timeStr = view['state']['values']['schedule-time']['schedule-time-action']['selected_time'];
+        const dateStr = view['state']['values']['schedule-date']['schedule-date-action']['selected_date'];
+        const timeStr = view['state']['values']['schedule-time']['schedule-time-action']['selected_time'];
+        // Timezone is not available in the ViewStateValue interface
+        // @ts-ignore
+        const tz = view['state']['values']['schedule-time']['schedule-time-action']['timezone'];
 
-        let dateTime: number;
-        if(dateStr && timeStr) {
-            dateTime = Date.parse(dateStr + "T" + timeStr + ":00");
-        }
+        let dateTime;
+        // Convert to the correct UTC time based on passed timezone
+        dateTime = adjustDateAndTimeForTimezone(dateStr, timeStr, tz);
         const attendees = selectedMemberIds.selected_users!;
 
         return {
@@ -94,12 +95,14 @@ export class SlackBot {
             parkingLot: parkingLot,
             attendees: attendees,
             pullRequests: pullRequests,
-            scheduleDateTime: dateTime!,
+            scheduleDateTime: dateTime,
+            timezone: tz
         }
     }
 
     /**
      * Create the main message to display to the user after submitting modal.
+     * @param messageType
      * @param viewInput
      * @param client
      * @param logger
@@ -179,10 +182,12 @@ export class SlackBot {
         const resp = await client.users.info({
             user: user
         });
+
         return {
             name: resp.user?.real_name!,
             userId: user,
-            img: resp.user?.profile?.image_72
+            img: resp.user?.profile?.image_72,
+            timezone: resp.user?.tz!
         }
     }
 
@@ -190,8 +195,8 @@ export class SlackBot {
         return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
     }
 
-    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
-        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId, args);
+    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string, timezone: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
+        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId, timezone, args);
     }
 
     public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<ChatPostEphemeralArguments | string> {
