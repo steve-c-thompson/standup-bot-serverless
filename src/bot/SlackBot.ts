@@ -1,4 +1,4 @@
-import {BlockAction, ButtonAction, Logger, SlashCommand, ViewOutput} from "@slack/bolt";
+import {BlockAction, ButtonAction, Logger, ModalView, SlashCommand, ViewOutput} from "@slack/bolt";
 import {
     ChatDeleteScheduledMessageResponse,
     ChatPostMessageArguments,
@@ -20,6 +20,12 @@ export class StandupInputData {
     attendees: string[] = []
     pullRequests?: string | null | undefined
     scheduleDateTime?: number | null | undefined
+}
+
+export class UserInfo {
+    name: string
+    userId: string
+    img?: string
 }
 
 export class SlackBot {
@@ -52,7 +58,7 @@ export class SlackBot {
     }
 
     /**
-     * Get either the memberIds that are members of the channel
+     * Get only the memberIds that are members of the channel
      * @param channelId
      * @param logger
      * @param client
@@ -68,6 +74,10 @@ export class SlackBot {
         return memberIds;
     }
 
+    /**
+     * Handle interaction with the modal view. This is tightly coupled with data from the view builder.
+     * @param view
+     */
     public getViewInputValues(view: ViewOutput): StandupInputData {
         const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
 
@@ -109,16 +119,21 @@ export class SlackBot {
         const channelId = viewInput.pm.channelId!;
         const userId = viewInput.pm.userId!;
 
-        const userInfo = await this.queryUser(userId, client);
+        const userInfoResponse = await this.queryUser(userId, client);
 
-        const userInfoMsg = userInfo.user?.real_name!;
+        const userInfoMsg = userInfoResponse.user?.real_name!;
+        const userInfo: UserInfo = {
+            name: userInfoResponse.user?.real_name!,
+            userId: userId,
+            img: userInfoResponse.user?.profile?.image_72
+        }
 
         let memberInfos: UsersInfoResponse[] = [];
         if (viewInput.attendees.length > 0) {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(userInfoMsg, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
+        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
             const saveDate = viewInput.scheduleDateTime ? new Date(viewInput.scheduleDateTime) : new Date();
@@ -130,8 +145,8 @@ export class SlackBot {
         // post as the user who requested
         return {
             channel: channelId,
-            username: userInfo.user?.real_name,
-            icon_url: userInfo.user?.profile?.image_72,
+            username: userInfo.name,
+            icon_url: userInfo.img,
             blocks: blocks,
             text: userInfoMsg,
             mrkdwn: true,
@@ -257,22 +272,33 @@ export class SlackBot {
         return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId, args);
     }
 
-    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<string> {
+    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<ChatPostEphemeralArguments | string> {
         // console.log(JSON.stringify(body, null, 2));
-        let button = body["actions"].find(i => i.action_id === "delete-msg-action");
-        let msgVal = (button as ButtonAction).value;
+        const button = body["actions"].find(i => i.action_id === "delete-msg-action");
+        const msgVal = (button as ButtonAction).value;
 
-        let cmd = DeleteCommand.buildFromString(msgVal);
+        const cmd = DeleteCommand.buildFromString(msgVal);
         console.log(`Deleting message ${cmd?.messageId} for channel ${cmd?.channelId}`);
         if(cmd) {
             try {
-                let result = await client.chat.deleteScheduledMessage(
+                const result = await client.chat.deleteScheduledMessage(
                     {
                         channel: cmd.channelId,
                         scheduled_message_id: cmd.messageId,
                     }
                 );
-                return result.ok ? `Message ${cmd.messageId} deleted` : result.error!.toString();
+                if(result.ok) {
+                    const msg = `Message ${cmd.messageId} deleted`;
+                    return {
+                        channel: body.channel?.id!,
+                        text: msg,
+                        mrkdwn: true,
+                        unfurl_links: false,
+                        unfurl_media: false,
+                        user: body.user.id
+                    };
+                }
+                return result.error!.toString();
             }
             catch(e) {
                 logger.error(e);
@@ -285,6 +311,10 @@ export class SlackBot {
             }
         }
         return "Invalid delete command";
+    }
+
+    public buildErrorView(msg: string): ModalView {
+        return this.viewBuilder.buildErrorView(msg);
     }
 
 }
