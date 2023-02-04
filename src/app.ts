@@ -100,7 +100,7 @@ const init = async () => {
                     viewInput.pm.channelId!,
                     viewInput.scheduleDateTime,
                     viewInput.pm.userId!,
-                    chatMessageArgs);
+                    chatMessageArgs as ChatScheduleMessageArguments);
 
                 await client.chat.postEphemeral(confMessage);
             }else {
