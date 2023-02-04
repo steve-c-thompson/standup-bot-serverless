@@ -1,7 +1,7 @@
 import {ChatScheduleMessageArguments, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
 import {Block, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {StandupInputData, UserInfo} from "./SlackBot";
+import {ChatMessageType, StandupInputData, UserInfo} from "./SlackBot";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -299,20 +299,36 @@ export class BotViewBuilder {
      * @param parkingLotAttendees
      * @param logger
      */
-    public buildChatMessageOutputBlocks(userInfo: UserInfo,
+    public buildChatMessageOutputBlocks(messageType: ChatMessageType,
+                                        userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
                                         pullRequests: string | null | undefined,
-                                        parkingLotAttendees: UsersInfoResponse[],
+                                        parkingLotAttendees: UserInfo[],
                                         logger: Logger) {
-        const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [
-            {
+        const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = []
+        blocks.push  ({
                 type: "header",
+                block_id: "header-block",
                 text: {
                     type: "plain_text",
                     text: userInfo.name + " :speaking_head_in_silhouette:",
                 }
-            },
+            });
+        // if this is a scheduled message, add the user's face
+        if(messageType === "scheduled") {
+            blocks.push({
+               type: "context",
+               elements: [
+                   {
+                       type: "image",
+                       image_url: userInfo.img!,
+                       alt_text: userInfo.name
+                   }
+               ]
+            });
+        }
+        blocks.push(
             {
                 type: "section",
                 text: {
@@ -327,7 +343,7 @@ export class BotViewBuilder {
                     text: ":arrow_forward: *Today*\n" + this.formatTextNumbersToStories(today)
                 }
             }
-        ];
+        );
 
         if (pullRequests) {
             blocks.push(
@@ -364,8 +380,8 @@ export class BotViewBuilder {
                     context.elements.push(
                         {
                             type: "image",
-                            image_url: m.user!.profile!.image_72!,
-                            alt_text: m.user!.real_name!
+                            image_url: m.img!,
+                            alt_text: m.name
                         }
                     );
                 });
@@ -394,10 +410,10 @@ export class BotViewBuilder {
      * @param divider
      * @private
      */
-    private formatMembersForOutput(memberInfos: UsersInfoResponse[], divider: string): string {
+    private formatMembersForOutput(memberInfos: UserInfo[], divider: string): string {
         let formatted = "";
         memberInfos.forEach((m, index) => {
-            formatted += this.atMember(m.user?.id!) + divider;
+            formatted += this.atMember(m.userId) + divider;
         });
 
         return formatted.toString();
