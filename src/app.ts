@@ -5,6 +5,7 @@ import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
 import {ChatScheduleMessageArguments} from "@slack/web-api";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -117,27 +118,7 @@ const init = async () => {
                 msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
                     "`@Standup`."
             }
-            const viewArgs: ModalView = {
-                type: 'modal',
-                callback_id: 'standup_view',
-                title: {
-                    type: 'plain_text',
-                    text: 'Standup Error'
-                },
-                close: {
-                    type: "plain_text",
-                    text: "Close",
-                },
-                blocks: [
-                    {
-                        type: "section",
-                        text: {
-                            type: "mrkdwn",
-                            text: msg
-                        }
-                    }
-                ]
-            };
+            const viewArgs = slackBot.buildErrorView(msg);
             try {
                 logger.info(viewArgs);
                 await ack({
@@ -155,7 +136,7 @@ const init = async () => {
         try {
             await ack();
             let result = await slackBot.deleteScheduledMessage(body as BlockAction, client, logger);
-            await say(result);
+            await client.chat.postEphemeral(result as ChatPostEphemeralArguments);
         } catch (e) {
             logger.error(e);
             await say("An error occurred " + e);

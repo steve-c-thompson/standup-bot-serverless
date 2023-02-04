@@ -1,7 +1,7 @@
 import {ChatScheduleMessageArguments, UsersInfoResponse, ViewsOpenArguments} from "@slack/web-api";
-import {Block, ContextBlock, HeaderBlock, Logger, SectionBlock} from "@slack/bolt";
+import {Block, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {StandupInputData} from "./SlackBot";
+import {StandupInputData, UserInfo} from "./SlackBot";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -41,6 +41,7 @@ export class BotViewBuilder {
     private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
 
     /**
+     * Build the primary input view using block kit.
      *
      * @param trigger_id
      * @param pm
@@ -178,23 +179,23 @@ export class BotViewBuilder {
                             text: "Optionally schedule this status."
                         },
                         element:
-                        {
-                            type: "datepicker",
-                            action_id: "schedule-date-action"
-                        },
+                            {
+                                type: "datepicker",
+                                action_id: "schedule-date-action"
+                            },
                     },
                     {
                         type: "input",
                         block_id: "schedule-time",
                         optional: true,
                         element:
-                        {
-                            type: "timepicker",
-                            action_id: "schedule-time-action"
-                        },
+                            {
+                                type: "timepicker",
+                                action_id: "schedule-time-action"
+                            },
                         label: {
                             type: "plain_text",
-                            text: " "
+                            text: "Select a date and time"
                         }
                     },
                 ],
@@ -208,52 +209,68 @@ export class BotViewBuilder {
     }
 
     /**
-     * If it is after 5pm, day is tomorrow. Otherwise assume today. 9am
+     * Build a date for the schedule picker.
+     * If it is after 5pm, day is tomorrow, otherwise assume today 9 am.
      * Edge cases of next month handled by Date
      * @private
      */
-    private buildInitialScheduleDate() :Date {
+    private buildInitialScheduleDate(): Date {
         const d = new Date();
-        if(d.getHours() >= 16){
+        if (d.getHours() >= 16) {
             d.setDate(d.getDate() + 1);
         }
         d.setHours(8, 0, 0, 0);
         return d;
     }
 
-    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
+    /**
+     * Build a message to post in chat. This message contains a button which delivers a payload that
+     * an action handler can parse to determine which message to delete.
+     *
+     * @param msgId
+     * @param channelId
+     * @param postAt
+     * @param userId
+     * @param args
+     */
+    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
         let postDt = new Date(postAt);
         const msg = "Your status below is scheduled to send on\n "
             + postDt.toLocaleDateString()
-        + " at " + postDt.toLocaleTimeString();
+            + " at " + postDt.toLocaleTimeString();
 
         const cmd = new DeleteCommand(msgId, channelId, postAt, userId);
         const body: ChatPostEphemeralArguments = {
             blocks: [
                 {
                     type: "section",
-                    block_id: "delete-msg",
                     text: {
                         type: "plain_text",
                         text: msg
                     },
-                    accessory: {
-                        type:"button",
-                        style: "danger",
-                        text: {
-                            type: "plain_text",
-                            text: "Delete Scheduled Status"
-                        },
-                        action_id: "delete-msg-action",
-                        value: cmd.formatForTransfer(),
-                        confirm: {
+                },
+                {
+                    type: "actions",
+                    block_id: "delete-msg",
+                    elements: [
+                        {
+                            type: "button",
+                            style: "danger",
                             text: {
                                 type: "plain_text",
-                                text: "Are you sure you want to delete this status?"
+                                text: "Delete Scheduled Status"
+                            },
+                            action_id: "delete-msg-action",
+                            value: cmd.formatForTransfer(),
+                            confirm: {
+                                text: {
+                                    type: "plain_text",
+                                    text: "Are you sure you want to delete this status?"
+                                }
                             }
                         }
 
-                    }
+                    ]
                 },
                 {
                     type: "divider"
@@ -263,6 +280,7 @@ export class BotViewBuilder {
             user: userId,
             text: msg
         }
+        // Now add the message contents
         body.blocks!.push(...args.blocks!);
         body.blocks!.push(
             {
@@ -271,7 +289,17 @@ export class BotViewBuilder {
         return body;
     }
 
-    public buildChatMessageOutputBlocks(userInfoMsg: string,
+    /**
+     * Create the output to post in chat.
+     * @param userInfo
+     * @param yesterday
+     * @param today
+     * @param parkingLotItems
+     * @param pullRequests
+     * @param parkingLotAttendees
+     * @param logger
+     */
+    public buildChatMessageOutputBlocks(userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
                                         pullRequests: string | null | undefined,
@@ -282,7 +310,7 @@ export class BotViewBuilder {
                 type: "header",
                 text: {
                     type: "plain_text",
-                    text: userInfoMsg + " :speaking_head_in_silhouette:",
+                    text: userInfo.name + " :speaking_head_in_silhouette:",
                 }
             },
             {
@@ -420,5 +448,30 @@ export class BotViewBuilder {
 
     public formatTextNumbersToStories(content: string) {
         return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$1" + "|$1>");
+    }
+
+    public buildErrorView(msg: string): ModalView {
+        const viewArgs: ModalView = {
+            type: 'modal',
+            callback_id: 'standup_view',
+            title: {
+                type: 'plain_text',
+                text: 'Standup Error'
+            },
+            close: {
+                type: "plain_text",
+                text: "Close",
+            },
+            blocks: [
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: msg
+                    }
+                }
+            ]
+        }
+        return viewArgs;
     }
 }
