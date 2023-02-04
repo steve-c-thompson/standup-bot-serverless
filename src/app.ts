@@ -85,11 +85,12 @@ const init = async () => {
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
         logger.debug("Handling standup-view submit");
         const viewInput = slackBot.getViewInputValues(view);
-        let chatMessageArgs = await slackBot.createChatMessageFromViewOutputAndSaveData(viewInput, client, logger);
         try {
             if(viewInput.scheduleDateTime) {
+                const chatMessageArgs = await slackBot.createChatMessageAndSaveData("scheduled", viewInput, client, logger);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
+                // Try to schedule before ack() in case there is an error
                 let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
                 await ack();
                 const date = new Date(scheduleResponse.post_at! * 1000);
@@ -104,7 +105,9 @@ const init = async () => {
                     chatMessageArgs as ChatScheduleMessageArguments);
 
                 await client.chat.postEphemeral(confMessage);
-            }else {
+            }
+            else {
+                const chatMessageArgs = await slackBot.createChatMessageAndSaveData("post", viewInput, client, logger);
                 await client.chat.postMessage(chatMessageArgs);
                 await ack();
                 const disclaimer = slackBot.createChatMessageEditDisclaimer(viewInput);

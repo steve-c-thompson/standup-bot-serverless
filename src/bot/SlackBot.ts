@@ -28,6 +28,8 @@ export class UserInfo {
     img?: string
 }
 
+export type ChatMessageType = "scheduled" | "post" | "ephemeral";
+
 export class SlackBot {
     private dao: StandupParkingLotDataDao;
 
@@ -45,8 +47,6 @@ export class SlackBot {
     public buildModalView(body: SlashCommand, logger: Logger): ViewsOpenArguments {
         const channelId = body.channel_id;
 
-        // let memberIds = await this.loadMemberIdsForModal(messageId, logger, client, body);
-
         const pm: PrivateMetadata = {
             channelId: channelId,
             userId: body.user_id
@@ -55,23 +55,6 @@ export class SlackBot {
         const trigger_id = body.trigger_id;
 
         return this.viewBuilder.buildModalInputView(trigger_id, pm);
-    }
-
-    /**
-     * Get only the memberIds that are members of the channel
-     * @param channelId
-     * @param logger
-     * @param client
-     * @param body
-     * @private
-     */
-    private async loadMemberIdsForModal(channelId: string, logger: Logger, client: WebClient, body: SlashCommand) {
-        let memberIds = await this.getChannelMembers(client, body, logger);
-
-        if (memberIds) {
-            memberIds = await this.filterMembersListForRemoved(memberIds, client, logger);
-        }
-        return memberIds;
     }
 
     /**
@@ -114,26 +97,26 @@ export class SlackBot {
             scheduleDateTime: dateTime!,
         }
     }
-    public async createChatMessageFromViewOutputAndSaveData(viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatScheduleMessageArguments> {
-        // channel_id and maybe user_id stored from submit
+
+    /**
+     * Create the main message to display to the user after submitting modal.
+     * @param viewInput
+     * @param client
+     * @param logger
+     */
+    public async createChatMessageAndSaveData(messageType: ChatMessageType, viewInput: StandupInputData, client: WebClient, logger: Logger): Promise<ChatPostMessageArguments | ChatScheduleMessageArguments> {
+        // channel_id and user_id stored from submit
         const channelId = viewInput.pm.channelId!;
         const userId = viewInput.pm.userId!;
 
-        const userInfoResponse = await this.queryUser(userId, client);
+        const userInfo = await this.queryUser(userId, client);
 
-        const userInfoMsg = userInfoResponse.user?.real_name!;
-        const userInfo: UserInfo = {
-            name: userInfoResponse.user?.real_name!,
-            userId: userId,
-            img: userInfoResponse.user?.profile?.image_72
-        }
-
-        let memberInfos: UsersInfoResponse[] = [];
+        let memberInfos: UserInfo[] = [];
         if (viewInput.attendees.length > 0) {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
+        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos, logger);
 
         try {
             const saveDate = viewInput.scheduleDateTime ? new Date(viewInput.scheduleDateTime) : new Date();
@@ -148,7 +131,7 @@ export class SlackBot {
             username: userInfo.name,
             icon_url: userInfo.img,
             blocks: blocks,
-            text: userInfoMsg,
+            text: userInfo.name,
             mrkdwn: true,
             unfurl_links: false,
             unfurl_media: false,
@@ -163,7 +146,7 @@ export class SlackBot {
             let proms = p.parkingLotData!.map(async i => {
                 let item = new ParkingLotDisplayItem();
                 let u = await this.queryUser(i.userId, client);
-                item.userName = u.user?.real_name!;
+                item.userName = u.name;
                 item.attendeeIds = i.attendees? i.attendees : [];
                 item.content = i.content;
                 return item;
@@ -177,14 +160,14 @@ export class SlackBot {
                                     date: Date,
                                     userId: string,
                                     parkingLotItems: string | null | undefined,
-                                    parkingLotAttendees: UsersInfoResponse[]) {
+                                    parkingLotAttendees: UserInfo[]) {
         const pla = parkingLotAttendees.map(u => {
-            return u.user?.id!;
+            return u.userId!;
         })
         await this.dao.upsertStandupParkingLotData(channelId, date, userId, parkingLotItems, pla);
     }
 
-    private async queryUsers(users: string[], client: WebClient) {
+    private async queryUsers(users: string[], client: WebClient): Promise<UserInfo[]> {
         const memberInfosProm = users?.map(m => {
             return this.queryUser(m, client);
         });
@@ -192,76 +175,15 @@ export class SlackBot {
         return await Promise.all(memberInfosProm!);
     }
 
-    private async queryUser(user: string, client: WebClient) {
-        return client.users.info({
+    private async queryUser(user: string, client: WebClient) : Promise<UserInfo> {
+        const resp = await client.users.info({
             user: user
         });
-    }
-
-    /**
-     * Filter the members list against the full list of users and remove anyone who is not active
-     * @param membersList
-     * @param client
-     * @param logger
-     * @private
-     */
-    private async filterMembersListForRemoved(membersList: string[], client: WebClient, logger: Logger): Promise<string[]> {
-        try {
-            const members = await this.queryUsers(membersList, client);
-            membersList = members.filter(m => {
-                return !m.user?.deleted;
-            }).map(u => {
-                return u.user!.id!;
-            });
-        } catch (e) {
-            logger.error(e);
+        return {
+            name: resp.user?.real_name!,
+            userId: user,
+            img: resp.user?.profile?.image_72
         }
-        return membersList;
-    }
-
-    /**
-     * Get members of a channel, whose id is found in the body. Additionally, filter bots.
-     * @param client
-     * @param body
-     * @param logger
-     * @private
-     */
-    private async getChannelMembers(client: WebClient, body: SlashCommand, logger: Logger): Promise<string[] | undefined> {
-        let memString;
-        try {
-            // get members of the channel
-            const members = await client.conversations.members({
-                channel: body.channel_id
-            });
-
-            memString = members.members;
-
-            // filter bots
-            const allMembers = await SlackBot.getAllMembers(client);
-
-            if (allMembers) {
-                const allBots = allMembers.filter(m => m.is_bot);
-                if (allBots) {
-                    const allBotIds = allBots.map(m => m.id)
-                    if (allBots && memString) {
-                        memString = memString.filter(m => !allBotIds.includes(m));
-                    }
-                }
-            }
-        } catch (e) {
-            logger.error(e);
-        }
-        return memString;
-    }
-
-    /**
-     * Get all members in a workspace.
-     * @param client
-     * @private
-     */
-    private static async getAllMembers(client: WebClient) {
-        const allMembers = await client.users.list();
-        return allMembers.members;
     }
 
     public createChatMessageEditDisclaimer(viewInput: StandupInputData) {
