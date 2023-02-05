@@ -4,9 +4,9 @@ import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
-import {ChatScheduleMessageArguments} from "@slack/web-api";
+import {ChatScheduleMessageArguments, WebClient} from "@slack/web-api";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {formatDateToMoment} from "./utils/datefunctions";
+import {formatDateToPrintable} from "./utils/datefunctions";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -86,23 +86,33 @@ const init = async () => {
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
         logger.debug("Handling standup-view submit");
         const viewInput = slackBot.getViewInputValues(view);
+        // Check if the bot is in channel. If not, update view with error
+        if(! await slackBot.validateBotUserInChannel(viewInput.pm.channelId!, body.view.bot_id, client)){
+            logger.error("Standup bot is not a member of channel " + viewInput.pm.channelId);
+            const msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
+                    "`@Standup`."
+            const viewArgs = slackBot.buildErrorView(msg);
+            logger.info(viewArgs);
+            await ack({
+                    response_action: "update",
+                    view: viewArgs
+                }
+            );
+            return;
+        }
+        await ack();
         try {
             if(viewInput.scheduleDateTime) {
-                // locale info for printing
-                const localeInfo = ["en-US", { timeZone: viewInput.timezone!}];
-                let scheduleStr = formatDateToMoment(viewInput.scheduleDateTime, viewInput.timezone!);
+                let scheduleStr = formatDateToPrintable(viewInput.scheduleDateTime, viewInput.timezone!);
                 const chatMessageArgs = await slackBot.createChatMessageAndSaveData("scheduled", viewInput, client, logger);
-                const toSchedule = new Date(viewInput.scheduleDateTime);
-                // @ts-ignore
                 console.log("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
-                // Try to schedule before ack() in case there is an error
                 let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
-                await ack();
+
                 const date = new Date(scheduleResponse.post_at! * 1000);
                 // @ts-ignore
-                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToMoment(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
+                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToPrintable(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
 
                 // Use the response to create a dialog
                 let msgId = scheduleResponse.scheduled_message_id!;
@@ -118,26 +128,20 @@ const init = async () => {
             else {
                 const chatMessageArgs = await slackBot.createChatMessageAndSaveData("post", viewInput, client, logger);
                 await client.chat.postMessage(chatMessageArgs);
-                await ack();
                 const disclaimer = slackBot.createChatMessageEditDisclaimer(viewInput);
                 await client.chat.postEphemeral(disclaimer);
             }
-
         } catch (error) {
             logger.error(error);
             let msg = (error as Error).message;
-            if (msg.includes("not_in_channel")) {
-                msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
-                    "`@Standup`."
-            }
             const viewArgs = slackBot.buildErrorView(msg);
             try {
                 logger.info(viewArgs);
                 await ack({
-                        response_action: "update",
-                        view: viewArgs
-                    }
-                );
+                   response_action: "update",
+                   view: viewArgs
+                });
+
             } catch (e) {
                 logger.error("Secondary error", e);
             }

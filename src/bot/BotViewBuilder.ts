@@ -2,7 +2,7 @@ import {ChatScheduleMessageArguments, ViewsOpenArguments} from "@slack/web-api";
 import {Block, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {ChatMessageType, StandupInputData, UserInfo} from "./SlackBot";
-import {formatDateToMoment} from "../utils/datefunctions";
+import {formatDateToPrintable} from "../utils/datefunctions";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -237,7 +237,7 @@ export class BotViewBuilder {
      * @param args
      */
     public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
-        const dateStr = formatDateToMoment(postAt, timezone);
+        const dateStr = formatDateToPrintable(postAt, timezone);
         const msg = "Your status below is scheduled to send on\n " + dateStr;
 
         const cmd = new DeleteCommand(msgId, channelId, postAt, userId);

@@ -1,6 +1,6 @@
 import moment from "moment-timezone";
 
-export function formatDateToMoment(dateTime: number, timezone: string): string {
+export function formatDateToPrintable(dateTime: number, timezone: string): string {
     const m = moment(dateTime).tz(timezone);
     return m.format("M/D/YYYY") + " at " + m.format("h:mm A");
 }
