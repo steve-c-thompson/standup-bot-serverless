@@ -1,10 +1,10 @@
-import {App, AwsLambdaReceiver, BlockAction, LogLevel, ModalView} from '@slack/bolt';
+import {App, AwsLambdaReceiver, BlockAction, LogLevel} from '@slack/bolt';
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
-import {ChatScheduleMessageArguments, WebClient} from "@slack/web-api";
+import {ChatScheduleMessageArguments} from "@slack/web-api";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {formatDateToPrintable} from "./utils/datefunctions";
 
@@ -134,14 +134,10 @@ const init = async () => {
         } catch (error) {
             logger.error(error);
             let msg = (error as Error).message;
-            const viewArgs = slackBot.buildErrorView(msg);
+            const viewArgs = slackBot.buildErrorMessage(viewInput, msg);
             try {
                 logger.info(viewArgs);
-                await ack({
-                   response_action: "update",
-                   view: viewArgs
-                });
-
+                await client.chat.postEphemeral(viewArgs);
             } catch (e) {
                 logger.error("Secondary error", e);
             }
