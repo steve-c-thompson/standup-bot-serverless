@@ -1,39 +1,14 @@
-import {ChatScheduleMessageArguments, ViewsOpenArguments} from "@slack/web-api";
-import {Block, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
+import {ChatScheduleMessageArguments, KnownBlock, ViewsOpenArguments} from "@slack/web-api";
+import {ActionsBlock, Block, Button, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {ChatMessageType, StandupInputData, UserInfo} from "./SlackBot";
+import {ChatMessageType, UserInfo} from "./SlackBot";
 import {formatDateToPrintable} from "../utils/datefunctions";
+import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
 
 export class ParkingLotDisplayItem {
     userName: string
     content: string
     attendeeIds: string[]
-}
-
-export class DeleteCommand {
-    channelId: string
-    messageId: string
-    postAt: number
-    userId: string
-
-    constructor(messageId: string, channelId: string, postAt: number, userId: string) {
-        this.messageId = messageId;
-        this.channelId = channelId;
-        this.postAt = postAt;
-        this.userId = userId;
-    }
-
-    public formatForTransfer(): string {
-        return this.messageId + "#" + this.channelId + "#" + this.postAt + "#" + this.userId;
-    }
-
-    public static buildFromString(str: string) : DeleteCommand | null{
-        let parts = str.split("#");
-        if(parts.length != 4) {
-            return null;
-        }
-        return new DeleteCommand(parts[0], parts[1], Number(parts[2]), parts[3]);
-    }
 }
 
 export class BotViewBuilder {
@@ -46,6 +21,7 @@ export class BotViewBuilder {
      *
      * @param trigger_id
      * @param pm
+     * @param userInfo
      */
     public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo): ViewsOpenArguments {
 
@@ -226,21 +202,17 @@ export class BotViewBuilder {
     }
 
     /**
-     * Build a message to post in chat. This message contains a button which delivers a payload that
-     * an action handler can parse to determine which message to delete.
+     * Build a message to post in chat. This message contains buttons which deliver payloads that
+     * an action handler can parse to determine which message to delete or edit.
      *
-     * @param msgId
-     * @param channelId
-     * @param postAt
-     * @param userId
-     * @param timezone
+     * @param cmd
+     * @param timezone`
      * @param args
      */
-    public buildScheduledMessageDeleteMessage(msgId: string, channelId: string, postAt: number, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
-        const dateStr = formatDateToPrintable(postAt, timezone);
+    public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
+        const dateStr = formatDateToPrintable(cmd.postAt, timezone);
         const msg = "Your status below is scheduled to send on\n " + dateStr;
 
-        const cmd = new DeleteCommand(msgId, channelId, postAt, userId);
         const body: ChatPostEphemeralArguments = {
             blocks: [
                 {
@@ -250,35 +222,13 @@ export class BotViewBuilder {
                         text: msg
                     },
                 },
-                {
-                    type: "actions",
-                    block_id: "delete-msg",
-                    elements: [
-                        {
-                            type: "button",
-                            style: "danger",
-                            text: {
-                                type: "plain_text",
-                                text: "Delete Scheduled Status"
-                            },
-                            action_id: "delete-msg-action",
-                            value: cmd.formatForTransfer(),
-                            confirm: {
-                                text: {
-                                    type: "plain_text",
-                                    text: "Are you sure you want to delete this status?"
-                                }
-                            }
-                        }
-
-                    ]
-                },
+                this.buildChangeMessageActions(this.buildDangerButton(cmd), this.buildEditButton(cmd, "Edit Scheduled Status")),
                 {
                     type: "divider"
                 }
             ],
-            channel: channelId,
-            user: userId,
+            channel: cmd.channelId,
+            user: cmd.userId,
             text: msg
         }
         // Now add the message contents
@@ -290,8 +240,51 @@ export class BotViewBuilder {
         return body;
     }
 
+    private buildChangeMessageActions(...buttons : Button[]): ActionsBlock {
+        const actions: ActionsBlock = {
+            type: "actions",
+            block_id: "change-msg",
+            elements: buttons
+        };
+
+        return actions;
+    }
+
+    private buildDangerButton(cmd: MessageCommand): Button{
+        return {
+            type: "button",
+            style: "danger",
+            text: {
+                type: "plain_text",
+                text: "Delete Scheduled Status"
+            },
+            action_id: "delete-msg-action",
+            value: cmd.formatForTransfer(),
+            confirm: {
+                text: {
+                    type: "plain_text",
+                    text: "Are you sure you want to delete this status?"
+                }
+            }
+        };
+    }
+
+    private buildEditButton(cmd: MessageCommand, msg: string): Button {
+        return {
+            type: "button",
+            text: {
+                type: "plain_text",
+                text: msg
+            },
+            action_id: "edit-msg-action",
+            value: cmd.formatForTransfer(),
+        };
+    }
+
     /**
      * Create the output to post in chat.
+     * @param: messageType
+     * @param messageType
      * @param userInfo
      * @param yesterday
      * @param today
@@ -434,13 +427,24 @@ export class BotViewBuilder {
         };
     }
 
-    public createChatMessageEditDisclaimer(viewInput: StandupInputData): ChatPostEphemeralArguments {
-        const channelId = viewInput.pm.channelId!;
-        const userId = viewInput.pm.userId!;
+    /**
+     * Create an ephemeral message containing an Edit button
+     * @param cmd
+     */
+    public buildChatMessageEditDialog(cmd: MessageCommand): ChatPostEphemeralArguments {
+        const channelId = cmd.channelId;
+        const userId = cmd.userId;
 
-        const blocks = [];
-        const msg = "You cannot edit your standup post. Add any updates in its thread :thread:"
-        blocks.push(this.buildEditDisclaimerBlock(msg));
+        const blocks: KnownBlock[] = [{
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: "You may edit your status"
+            }
+        }];
+        const msg = "Edit status"
+
+        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, "Edit status")));
         return {
             channel: channelId,
             user: userId,
@@ -467,6 +471,10 @@ export class BotViewBuilder {
         return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$1" + "|$1>");
     }
 
+    /**
+     * Build an error view around the message, with an X and title.
+     * @param msg
+     */
     public buildErrorView(msg: string): ModalView {
         const viewArgs: ModalView = {
             type: 'modal',
@@ -492,10 +500,13 @@ export class BotViewBuilder {
         return viewArgs;
     }
 
-    public buildErrorMessage(input: StandupInputData, msg: string): ChatPostEphemeralArguments {
-        const channelId = input.pm.channelId!;
-        const userId = input.pm.userId!;
-
+    /**
+     * Build a full ephemeral message to post in the `channelId` and `userId` found on input
+     * @param channelId
+     * @param userId
+     * @param msg
+     */
+    public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments {
         return {
             channel: channelId,
             user: userId,

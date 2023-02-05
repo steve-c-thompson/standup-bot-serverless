@@ -1,10 +1,11 @@
-import {BlockAction, ButtonAction, Logger, ModalView, SlashCommand, ViewOutput} from "@slack/bolt";
+import {BlockElementAction, ButtonAction, Logger, ModalView, SlashCommand, ViewOutput} from "@slack/bolt";
 import {ChatPostMessageArguments, ChatScheduleMessageArguments, ViewsOpenArguments, WebClient} from "@slack/web-api";
 import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
-import {BotViewBuilder, DeleteCommand, ParkingLotDisplayItem} from "./BotViewBuilder";
+import {BotViewBuilder, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {adjustDateAndTimeForTimezone} from "../utils/datefunctions";
+import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
 
 export class StandupInputData {
     pm: PrivateMetadata
@@ -191,20 +192,28 @@ export class SlackBot {
         }
     }
 
-    public createChatMessageEditDisclaimer(viewInput: StandupInputData) {
-        return this.viewBuilder.createChatMessageEditDisclaimer(viewInput);
+    public buildChatMessageEditDialog(cmd: MessageCommand) {
+        return this.viewBuilder.buildChatMessageEditDialog(cmd);
     }
 
-    public buildScheduledMessageDelete(msgId: string, channelId: string, postAt: number, userId: string, timezone: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
-        return this.viewBuilder.buildScheduledMessageDeleteMessage(msgId, channelId, postAt, userId, timezone, args);
+    public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
+        return this.viewBuilder.buildScheduledMessageDialog(cmd, timezone, args);
     }
 
-    public async deleteScheduledMessage(body: BlockAction, client: WebClient, logger: Logger) : Promise<ChatPostEphemeralArguments | string> {
+    /**
+     * Delete the message based on its ID. Button payload must be
+     *
+     * `messageId + "#" + channelId + "#" + postAt + "#" + userId`
+     *
+     * @param action
+     * @param client
+     * @param logger
+     */
+    public async deleteScheduledMessage(action: BlockElementAction, client: WebClient, logger: Logger) : Promise<ChatPostEphemeralArguments | string> {
         // console.log(JSON.stringify(body, null, 2));
-        const button = body["actions"].find(i => i.action_id === "delete-msg-action");
-        const msgVal = (button as ButtonAction).value;
+        const msgVal = (action as ButtonAction).value;
 
-        const cmd = DeleteCommand.buildFromString(msgVal);
+        const cmd = ChangeScheduledMessageCommand.buildFromString(msgVal);
         console.log(`Deleting message ${cmd?.messageId} for channel ${cmd?.channelId}`);
         if(cmd) {
             try {
@@ -217,12 +226,12 @@ export class SlackBot {
                 if(result.ok) {
                     const msg = `Message ${cmd.messageId} deleted`;
                     return {
-                        channel: body.channel?.id!,
+                        channel: cmd.channelId,
                         text: msg,
                         mrkdwn: true,
                         unfurl_links: false,
                         unfurl_media: false,
-                        user: body.user.id
+                        user: cmd.userId
                     };
                 }
                 return result.error!.toString();
@@ -234,18 +243,37 @@ export class SlackBot {
             finally {
                 // also clean up the parking lot items
                 console.log(`Removing Standup Parking Lot Data ${cmd.channelId} ${cmd.postAt} ${cmd.userId}`);
-                await this.dao.removeStandupParkingLotData(cmd.channelId, new Date(cmd.postAt), cmd.userId);
+                await this.dao.removeStandupParkingLotData(cmd.channelId, new Date(cmd.postAt!), cmd.userId);
             }
         }
         return "Invalid delete command";
+    }
+
+    /**
+     * Create a modal view to edit the message. Retrieve data for the message, format, and delegate to builder.
+     *
+     * Button payload must be
+     *
+     * `ts + "#" + channelId + "#" + "#" + userId`
+     *
+     * @param action
+     * @param client
+     * @param logger
+     */
+    public async editScheduledMessage(action: BlockElementAction, client: WebClient, logger: Logger) : Promise<ModalView | string> {
+        const msgVal = (action as ButtonAction).value;
+        // get existing data and load into modal view for display
+
+        const cmd = ChangeScheduledMessageCommand.buildFromString(msgVal);
+        return "edit message " + cmd?.formatForTransfer();
     }
 
     public buildErrorView(msg: string): ModalView {
         return this.viewBuilder.buildErrorView(msg);
     }
 
-    public buildErrorMessage(input: StandupInputData, msg: string): ChatPostEphemeralArguments {
-        return this.viewBuilder.buildErrorMessage(input, msg);
+    public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments {
+        return this.viewBuilder.buildErrorMessage(channelId, userId, msg);
     }
 
     async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
