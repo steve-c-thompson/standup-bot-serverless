@@ -491,4 +491,24 @@ export class BotViewBuilder {
         }
         return viewArgs;
     }
+
+    public buildErrorMessage(input: StandupInputData, msg: string): ChatPostEphemeralArguments {
+        const channelId = input.pm.channelId!;
+        const userId = input.pm.userId!;
+
+        return {
+            channel: channelId,
+            user: userId,
+            blocks: [
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: msg
+                    }
+                }
+            ],
+            text: msg
+        };
+    }
 }

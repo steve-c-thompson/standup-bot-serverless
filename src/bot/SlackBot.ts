@@ -244,6 +244,10 @@ export class SlackBot {
         return this.viewBuilder.buildErrorView(msg);
     }
 
+    public buildErrorMessage(input: StandupInputData, msg: string): ChatPostEphemeralArguments {
+        return this.viewBuilder.buildErrorMessage(input, msg);
+    }
+
     async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
         const channelData = await client.conversations.members({
             channel: channelId,
