@@ -244,4 +244,19 @@ export class SlackBot {
         return this.viewBuilder.buildErrorView(msg);
     }
 
+    async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
+        const channelData = await client.conversations.members({
+            channel: channelId,
+        });
+        // Get data about this bot to compare its usersID against the list
+        const botData = await client.bots.info({
+            bot: botId
+        })
+        const botUserId = botData.bot?.user_id;
+        return !!channelData.members?.find(m => {
+            return m === botUserId;
+        });
+
+    }
+
 }
