@@ -11,12 +11,13 @@ import {
     SectionBlock
 } from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {ChatMessageType} from "./SlackBot";
+import {StandupMessageType} from "./SlackBot";
 import {formatDateToPrintable} from "../utils/datefunctions";
 import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
+import {PrivateMetadata} from "../dto/PrivateMetadata";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -32,13 +33,12 @@ export class BotViewBuilder {
     /**
      * Build the primary input view using block kit.
      *
-     * @param messageType
      * @param trigger_id
      * @param pm
      * @param userInfo
      * @param blockData
      */
-    public buildModalInputView(messageType: ChatMessageType, trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo, blockData?: StandupViewData): ViewsOpenArguments {
+    public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo, blockData?: StandupViewData): ViewsOpenArguments {
         // const date = this.buildInitialScheduleDate();
         let args: ViewsOpenArguments = {
             trigger_id: trigger_id,
@@ -168,8 +168,8 @@ export class BotViewBuilder {
                 }
             }
         };
-        // If this is a post message, add the option to schedule it
-        if(messageType === "post") {
+        // If this is a post or scheduled message, add the option to schedule it
+        if(pm.messageType === "post" || pm.messageType === "scheduled") {
             args.view.blocks.push({
                     type: "input",
                     block_id: "schedule-date",
@@ -213,7 +213,12 @@ export class BotViewBuilder {
             if(blockData.pullRequests){
                 this.loadBlock(args, "pull-requests", blockData.pullRequests);
             }
-            // Don't worry about schedule dates, this cannot be scheduled
+            if(blockData.dateStr) {
+                this.loadBlock(args, "schedule-date", blockData.dateStr);
+            }
+            if(blockData.timeStr) {
+                this.loadBlock(args, "schedule-time", blockData.timeStr);
+            }
         }
 
         return args;
@@ -355,7 +360,7 @@ export class BotViewBuilder {
      * @param parkingLotAttendees
      * @param logger
      */
-    public buildChatMessageOutputBlocks(messageType: ChatMessageType,
+    public buildChatMessageOutputBlocks(messageType: StandupMessageType,
                                         userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
