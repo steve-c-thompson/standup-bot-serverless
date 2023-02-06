@@ -1,9 +1,22 @@
-import {ChatScheduleMessageArguments, KnownBlock, ViewsOpenArguments} from "@slack/web-api";
-import {ActionsBlock, Block, Button, ContextBlock, HeaderBlock, Logger, ModalView, SectionBlock} from "@slack/bolt";
+import {ChatScheduleMessageArguments, KnownBlock, PlainTextInput, Timepicker, ViewsOpenArguments} from "@slack/web-api";
+import {
+    ActionsBlock,
+    Block,
+    Button,
+    ContextBlock, Datepicker,
+    HeaderBlock,
+    InputBlock,
+    Logger,
+    ModalView, MultiUsersSelect,
+    SectionBlock
+} from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {ChatMessageType, UserInfo} from "./SlackBot";
+import {ChatMessageType} from "./SlackBot";
 import {formatDateToPrintable} from "../utils/datefunctions";
 import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
+import {StandupViewData} from "../dto/StandupViewData";
+import {UserInfo} from "../dto/UserInfo";
+import {ACTION_NAMES} from "./ViewConstants";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -19,12 +32,13 @@ export class BotViewBuilder {
     /**
      * Build the primary input view using block kit.
      *
+     * @param messageType
      * @param trigger_id
      * @param pm
      * @param userInfo
+     * @param blockData
      */
-    public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo): ViewsOpenArguments {
-
+    public buildModalInputView(messageType: ChatMessageType, trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo, blockData?: StandupViewData): ViewsOpenArguments {
         // const date = this.buildInitialScheduleDate();
         let args: ViewsOpenArguments = {
             trigger_id: trigger_id,
@@ -34,8 +48,8 @@ export class BotViewBuilder {
                 // View identifier
                 callback_id: 'standup_view',
                 clear_on_close: true,
-                // Save the channel ID and user ID for subsequent interactions
-                private_metadata: JSON.stringify(pm),
+                // Save the channel ID, user ID, and maybe message id (ts) for subsequent interactions
+                private_metadata: JSON.stringify(pm, null, 2),
                 title: {
                     type: 'plain_text',
                     text: 'Async Standup Status'
@@ -59,7 +73,7 @@ export class BotViewBuilder {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "yesterday-action",
+                            action_id: ACTION_NAMES.get("YESTERDAY"),
                             focus_on_load: true,
                             placeholder: {
                                 type: "plain_text",
@@ -78,7 +92,7 @@ export class BotViewBuilder {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "today-action",
+                            action_id: ACTION_NAMES.get("TODAY"),
                             placeholder: {
                                 type: "plain_text",
                                 text: "What you will do today"
@@ -97,7 +111,7 @@ export class BotViewBuilder {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "parking-lot-action",
+                            action_id: ACTION_NAMES.get("PARKING_LOT"),
                             placeholder: {
                                 type: "plain_text",
                                 text: "Parking Lot items to discuss"
@@ -120,7 +134,7 @@ export class BotViewBuilder {
                                 text: "Select teammates",
                                 emoji: true,
                             },
-                            action_id: "parking-lot-participants-action"
+                            action_id: ACTION_NAMES.get("PARTICIPANTS"),
                         },
                         label: {
                             type: "plain_text",
@@ -135,7 +149,7 @@ export class BotViewBuilder {
                         element: {
                             type: "plain_text_input",
                             multiline: true,
-                            action_id: "pull-requests-action",
+                            action_id: ACTION_NAMES.get("PULL_REQUESTS"),
                             placeholder: {
                                 type: "plain_text",
                                 text: "PRs you need reviewed"
@@ -147,35 +161,6 @@ export class BotViewBuilder {
                             emoji: true
                         }
                     },
-                    {
-                        type: "input",
-                        block_id: "schedule-date",
-                        optional: true,
-                        label: {
-                            type: "plain_text",
-                            text: "Optionally schedule this status."
-                        },
-                        element:
-                            {
-                                type: "datepicker",
-                                action_id: "schedule-date-action",
-                            },
-                    },
-                    {
-                        type: "input",
-                        block_id: "schedule-time",
-                        optional: true,
-                        element:
-                            {
-                                type: "timepicker",
-                                action_id: "schedule-time-action",
-                                timezone: userInfo.timezone
-                            },
-                        label: {
-                            type: "plain_text",
-                            text: "Select a date and time"
-                        }
-                    },
                 ],
                 submit: {
                     type: 'plain_text',
@@ -183,7 +168,86 @@ export class BotViewBuilder {
                 }
             }
         };
+        // If this is a post message, add the option to schedule it
+        if(messageType === "post") {
+            args.view.blocks.push({
+                    type: "input",
+                    block_id: "schedule-date",
+                    optional: true,
+                    label: {
+                        type: "plain_text",
+                        text: "Optionally schedule this status."
+                    },
+                    element:
+                        {
+                            type: "datepicker",
+                            action_id: ACTION_NAMES.get("SCHEDULE_DATE"),
+                        },
+                },
+                {
+                    type: "input",
+                    block_id: "schedule-time",
+                    optional: true,
+                    element:
+                        {
+                            type: "timepicker",
+                            action_id: ACTION_NAMES.get("SCHEDULE_TIME"),
+                            timezone: userInfo.timezone
+                        },
+                    label: {
+                        type: "plain_text",
+                        text: "Select a date and time"
+                    }
+                },);
+        }
+
+        if(blockData) {
+            this.loadBlock(args, "yesterday", blockData.yesterday);
+            this.loadBlock(args, "today", blockData.today);
+            if(blockData.parkingLot){
+                this.loadBlock(args, "parking-lot", blockData.parkingLot);
+            }
+            if(blockData.attendees){
+                this.loadBlock(args, "parking-lot-participants", blockData.attendees);
+            }
+            if(blockData.pullRequests){
+                this.loadBlock(args, "pull-requests", blockData.pullRequests);
+            }
+            // Don't worry about schedule dates, this cannot be scheduled
+        }
+
         return args;
+    }
+
+    /**
+     * Depending on the block type, set its initial value
+     * @param viewArgs
+     * @param blockId
+     * @param blockValue
+     * @private
+     */
+    private loadBlock(viewArgs: ViewsOpenArguments, blockId: string, blockValue: string | string[]) {
+        const block: Block | undefined = this.findBlockById(viewArgs, blockId);
+        if(block as InputBlock) {
+            switch((block as InputBlock).element.type) {
+                case "plain_text_input":
+                    ((block as InputBlock).element as PlainTextInput).initial_value = blockValue as string;
+                    break;
+                case "multi_users_select":
+                    ((block as InputBlock).element as MultiUsersSelect).initial_users = blockValue as string[];
+                    break;
+                case "datepicker":
+                    ((block as InputBlock).element as Datepicker).initial_date = blockValue as string;
+                    break;
+                case "timepicker":
+                    ((block as InputBlock).element as Timepicker).initial_time = blockValue as string;
+                    break;
+            }
+        }
+    }
+
+    private findBlockById(viewArgs: ViewsOpenArguments, blockId: string): Block | undefined{
+        return viewArgs.view.blocks.find(b => b.block_id === blockId);
     }
 
     /**
@@ -222,7 +286,7 @@ export class BotViewBuilder {
                         text: msg
                     },
                 },
-                this.buildChangeMessageActions(this.buildDangerButton(cmd), this.buildEditButton(cmd, "Edit Scheduled Status")),
+                this.buildChangeMessageActions(this.buildDeleteButton(cmd, ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE")!, "Delete Scheduled Status"), this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE")!,"Edit Scheduled Status")),
                 {
                     type: "divider"
                 }
@@ -241,24 +305,22 @@ export class BotViewBuilder {
     }
 
     private buildChangeMessageActions(...buttons : Button[]): ActionsBlock {
-        const actions: ActionsBlock = {
+        return {
             type: "actions",
             block_id: "change-msg",
             elements: buttons
         };
-
-        return actions;
     }
 
-    private buildDangerButton(cmd: MessageCommand): Button{
+    private buildDeleteButton(cmd: MessageCommand, actionId:string, msg: string): Button{
         return {
             type: "button",
             style: "danger",
             text: {
                 type: "plain_text",
-                text: "Delete Scheduled Status"
+                text: msg
             },
-            action_id: "delete-msg-action",
+            action_id: actionId,
             value: cmd.formatForTransfer(),
             confirm: {
                 text: {
@@ -269,14 +331,14 @@ export class BotViewBuilder {
         };
     }
 
-    private buildEditButton(cmd: MessageCommand, msg: string): Button {
+    private buildEditButton(cmd: MessageCommand, actionId: string, msg: string): Button {
         return {
             type: "button",
             text: {
                 type: "plain_text",
                 text: msg
             },
-            action_id: "edit-msg-action",
+            action_id: actionId,
             value: cmd.formatForTransfer(),
         };
     }
@@ -417,7 +479,7 @@ export class BotViewBuilder {
         return "<@" + id + ">";
     }
 
-    private buildEditDisclaimerBlock(msg: string) {
+    public buildSimpleContextBlock(msg: string)   {
         return {
             type: "context",
             elements: [{
@@ -444,7 +506,7 @@ export class BotViewBuilder {
         }];
         const msg = "Edit status"
 
-        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, "Edit status")));
+        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_MESSAGE")!,"Edit Status")));
         return {
             channel: channelId,
             user: userId,

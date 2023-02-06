@@ -4,4 +4,5 @@
 interface PrivateMetadata {
     channelId?: string;
     userId?: string;
+    msgId?: string;
 }

@@ -17,7 +17,7 @@ export class ChangePostedMessageCommand implements MessageCommand {
     }
 
     formatForTransfer(): string {
-        return this.ts + "#" + this.channelId + "#" + "#" + this.userId;;
+        return this.ts + "#" + this.channelId + "#" + this.userId;;
     }
 
     public static buildFromString(str: string): ChangePostedMessageCommand | null {
@@ -25,7 +25,7 @@ export class ChangePostedMessageCommand implements MessageCommand {
         if (parts.length != 3) {
             return null;
         }
-        return new ChangePostedMessageCommand(parts[0], parts[1], parts[3]);
+        return new ChangePostedMessageCommand(parts[0], parts[1], parts[2]);
     }
 }
 

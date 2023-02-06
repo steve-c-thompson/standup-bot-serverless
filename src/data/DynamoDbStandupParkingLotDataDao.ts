@@ -106,7 +106,7 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
             }
         }
         else {
-            logger.warn(`Could not find parking lot data for ${channelId} and ${date.toLocaleString()}`);
+            logger.info(`Could not find parking lot data for ${channelId} and ${date.toLocaleString()}`);
         }
         return null;
     }

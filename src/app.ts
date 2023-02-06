@@ -4,10 +4,11 @@ import {context, logger} from "./utils/context";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
 import {DynamoDbStandupParkingLotDataDao} from "./data/DynamoDbStandupParkingLotDataDao";
-import {ChatScheduleMessageArguments} from "@slack/web-api";
+import {ChatScheduleMessageArguments, ChatUpdateArguments} from "@slack/web-api";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {formatDateToPrintable} from "./utils/datefunctions";
 import {ChangePostedMessageCommand, ChangeScheduledMessageCommand} from "./bot/Commands";
+import {ACTION_NAMES} from "./bot/ViewConstants";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -73,7 +74,7 @@ const init = async () => {
         }
         else {
             try {
-                let payload = await slackBot.buildModalView(body, client, logger);
+                let payload = await slackBot.buildNewMessageModalView(body, client, logger);
                 const result = await client.views.open(
                     payload
                 );
@@ -103,19 +104,23 @@ const init = async () => {
         }
         await ack();
         try {
-            // TODO somehow check if this is an update vs new message
+            // Check privateMetaData to see if a messageId was included
+            const isEdit: boolean = !!viewInput.pm.msgId;
+            // logger.debug("Handling view input\n" + JSON.stringify(view, null, 2));
             if(viewInput.scheduleDateTime) {
-                // User is trying to schedule a message
+                // TODO If this is an edit schedule message, delete the existing as well as parking lot data
+
+                // Schedule a new message
                 let scheduleStr = formatDateToPrintable(viewInput.scheduleDateTime, viewInput.timezone!);
                 const chatMessageArgs = await slackBot.createChatMessageAndSaveData("scheduled", viewInput, client, logger);
-                console.log("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
+                logger.info("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
                 let scheduleResponse = await client.chat.scheduleMessage(chatMessageArgs as ChatScheduleMessageArguments);
 
                 const date = new Date(scheduleResponse.post_at! * 1000);
                 // @ts-ignore
-                console.log(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToPrintable(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
+                logger.info(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToPrintable(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
 
                 // Use the response to create a dialog
                 let msgId = scheduleResponse.scheduled_message_id!;
@@ -129,11 +134,28 @@ const init = async () => {
                 await client.chat.postEphemeral(confMessage);
             }
             else {
-                const chatMessageArgs = await slackBot.createChatMessageAndSaveData("post", viewInput, client, logger);
-                const result = await client.chat.postMessage(chatMessageArgs);
-                const cmd = new ChangePostedMessageCommand(result.message?.ts!, result.channel!, viewInput.pm.userId!);
-                const edit = slackBot.buildChatMessageEditDialog(cmd);
-                await client.chat.postEphemeral(edit);
+                if(isEdit) {
+                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData("edit", viewInput, client, logger) as ChatUpdateArguments;
+                    // Update the message using the API
+                    const result = await client.chat.update(chatMessageArgs);
+                    // Print the result of the attempt
+                    if(result.ok){
+                        console.log(`Message ${result.ts} updated`);
+                        const msg = await slackBot.buildEphemeralContextMessage(result.channel!, viewInput.pm.userId!, "Your status was updated");
+                        await client.chat.postEphemeral(msg);
+                    }
+                    else {
+                        const msg = await slackBot.buildEphemeralContextMessage(viewInput.pm.channelId!, viewInput.pm.userId!, result.error!);
+                        await client.chat.postEphemeral(msg);
+                    }
+                }
+                else {
+                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData("post", viewInput, client, logger);
+                    const result = await client.chat.postMessage(chatMessageArgs);
+                    const cmd = new ChangePostedMessageCommand(result.message?.ts!, result.channel!, viewInput.pm.userId!);
+                    const edit = slackBot.buildChatMessageEditDialog(cmd);
+                    await client.chat.postEphemeral(edit);
+                }
             }
         } catch (error) {
             logger.error(error);
@@ -151,18 +173,19 @@ const init = async () => {
     app.action({block_id: "change-msg"}, async ({body,  ack, say, logger, client }) => {
         try {
             await ack();
-            const deleteAction = (body as BlockAction)["actions"].find(i => i.action_id === "delete-msg-action");
-            if(deleteAction) {
-                const result = await slackBot.deleteScheduledMessage(deleteAction as BlockElementAction, client, logger);
-                await client.chat.postEphemeral(result as ChatPostEphemeralArguments);
+            const action = (body as BlockAction)["actions"][0];
+            let result;
+            switch (action.action_id) {
+                case ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE"):
+                    result = await slackBot.deleteScheduledMessage(action, client, logger);
+                    await client.chat.postEphemeral(result as ChatPostEphemeralArguments);
+                    break;
+                case ACTION_NAMES.get("EDIT_MESSAGE"):
+                    result = await slackBot.buildModalViewForUpdate(body as BlockAction, client, logger);
+                    await client.views.open(result);
+                    break;
             }
-            else {
-                const editAction = (body as BlockAction)["actions"].find(i => i.action_id === "edit-msg-action");
-                if (editAction) {
-                    const result = await slackBot.editScheduledMessage(editAction as BlockElementAction, client, logger);
-                    await say(result);
-                }
-            }
+
         } catch (e) {
             logger.error(e);
             await say("An error occurred " + e);
