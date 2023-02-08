@@ -6,7 +6,6 @@ import {
     ContextBlock, Datepicker,
     HeaderBlock,
     InputBlock,
-    Logger,
     ModalView, MultiUsersSelect,
     SectionBlock
 } from "@slack/bolt";
@@ -17,6 +16,7 @@ import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
+import {logger} from "../utils/context";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -351,15 +351,13 @@ export class BotViewBuilder {
      * @param parkingLotItems
      * @param pullRequests
      * @param parkingLotAttendees
-     * @param logger
      */
     public buildChatMessageOutputBlocks(messageType: StandupMessageType,
                                         userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
                                         pullRequests: string | null | undefined,
-                                        parkingLotAttendees: UserInfo[],
-                                        logger: Logger) {
+                                        parkingLotAttendees: UserInfo[]) {
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = []
         blocks.push  ({
                 type: "header",
@@ -466,7 +464,7 @@ export class BotViewBuilder {
      */
     private formatMembersForOutput(memberInfos: UserInfo[], divider: string): string {
         let formatted = "";
-        memberInfos.forEach((m, index) => {
+        memberInfos.forEach((m) => {
             formatted += this.atMember(m.userId) + divider;
         });
 

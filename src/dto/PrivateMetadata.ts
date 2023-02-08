@@ -7,5 +7,5 @@ export interface PrivateMetadata {
     channelId?: string;
     userId?: string;
     messageId?: string;
-    messageType?: StandupMessageType
+    messageType: StandupMessageType
 }

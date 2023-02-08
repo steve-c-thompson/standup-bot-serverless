@@ -18,12 +18,12 @@ resources:
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             AttributeType: "S"
           - AttributeName: "standupDate"
             AttributeType: "N"
         KeySchema:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             KeyType: "HASH"
           - AttributeName: "standupDate"
             KeyType: "RANGE"
@@ -39,18 +39,14 @@ resources:
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             AttributeType: "S"
           - AttributeName: "standupDate"
             AttributeType: "N"
-          - AttributeName: "userId"
-            AttributeType: "S"
         KeySchema:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             KeyType: "HASH"
           - AttributeName: "standupDate"
-            KeyType: "RANGE"
-          - AttributeName: "userId"
             KeyType: "RANGE"
         ProvisionedThroughput:
           ReadCapacityUnits: 1

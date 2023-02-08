@@ -9,7 +9,7 @@ beforeEach(async () => {
 });
 
 // Now leave it how we found it
-afterAll( async () => {
+afterAll(async () => {
     await createStandupParkingLotData();
 })
 describe(DynamoDbStandupParkingLotDataDao.name, () => {
@@ -24,17 +24,17 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
         it("an existing entity", async () => {
             let r = await dao.getChannelDataForDate("ABC", jan1);
             expect(r).toBeTruthy();
-            expect(r?.channelId).toEqual("ABC");
+            expect(r?.id).toEqual("ABC");
             expect(r?.createdAt).toBeTruthy();
             expect(r?.updatedAt).toBeTruthy();
-            expect(r?.channelId).toBeTruthy();
+            expect(r?.id).toBeTruthy();
             expect(r?.timeToLive).toBeTruthy();
             expect(r?.parkingLotData).toHaveLength(2);
         });
         it("an existing entity with ttl day plus one", async () => {
             let r = await dao.getChannelDataForDate("ABC", jan1);
             expect(r).toBeTruthy();
-            expect(r?.channelId).toEqual("ABC");
+            expect(r?.id).toEqual("ABC");
             expect(r?.timeToLive).toEqual(jan2Zero);
             expect(r?.parkingLotData).toHaveLength(2);
         });
@@ -47,7 +47,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
     describe("should update", () => {
             it('an existing data without overwriting missing data', async () => {
                 let d = new StandupParkingLotData();
-                d.channelId = "ABC";
+                d.id = "ABC";
                 d.standupDate = jan1;
                 d.parkingLotData = undefined; // set the data to missing value
                 d = await dao.updateData(d);
@@ -68,19 +68,20 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 expect(d?.standupDate?.getUTCMinutes()).toEqual(0);
             });
 
-            it('fields including updatedAt but not createdAt or timeToLive', async () => {
-                let d = DynamoDbStandupParkingLotDataDao.objectFactory("ABC", jan2, [
+            it('fields including updatedAt but not createdAt', async () => {
+                let d = DynamoDbStandupParkingLotDataDao.objectFactory("ABC", jan2Zero, [
                     {
                         userId: "new",
                         content: "new content",
                     }
                 ]);
                 let createdAt = new Date('December 17, 2015 03:24:00');
-                let ttl = new Date(createdAt.getTime());
-                ttl.setDate(createdAt.getDate() + 1);
+                let ttl = new Date(jan2Zero);
+                ttl.setDate(jan2Zero.getDate() + 1);
                 d.createdAt = createdAt;
                 d.updatedAt = createdAt;
                 d.timeToLive = ttl;
+                // Execute
                 d = await dao.updateData(d);
                 expect(d?.parkingLotData).toEqual([{
                     userId: "new",
@@ -96,7 +97,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
 
     it('should insert without error and zero standupDate', async () => {
         let d = new StandupParkingLotData();
-        d.channelId = "XXX";
+        d.id = "XXX";
         d.standupDate = jan1;
         d.parkingLotData = [{
             userId: "new",
@@ -109,7 +110,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
         } catch (e) {
             console.log(e);
         }
-        expect(d?.channelId).toEqual("XXX");
+        expect(d?.id).toEqual("XXX");
         expect(d?.parkingLotData).toEqual([{
             userId: "new",
             content: "new content",
@@ -136,7 +137,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 } catch (e) {
                     console.log(e);
                 }
-                expect(d?.channelId).toEqual("ABC");
+                expect(d?.id).toEqual("ABC");
                 // also has existing
                 expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
                     userId: "Ricky",
@@ -161,7 +162,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                     } catch (e) {
                         console.log(e);
                     }
-                    expect(d?.channelId).toEqual("ABC");
+                    expect(d?.id).toEqual("ABC");
                     expect(d?.parkingLotData).toEqual(expect.arrayContaining([{
                         userId: "Bobby",
                         content: "things",
@@ -187,25 +188,25 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 })
         });
 
-    describe("remove",  () => {
+    describe("remove", () => {
         it('should remove existing and return object', async () => {
-            let result = await dao.removeStandupParkingLotData("ABC", jan1, "Ricky");
-            expect(result).toBeTruthy();
-            expect(result?.parkingLotData).toEqual(expect.arrayContaining([
-                testParkingLotData.parkingLotData![1]
-            ]));
+                let result = await dao.removeStandupParkingLotData("ABC", jan1, "Ricky");
+                expect(result).toBeTruthy();
+                expect(result?.parkingLotData).toEqual(expect.arrayContaining([
+                    testParkingLotData.parkingLotData![1]
+                ]));
             }
         ),
-        it('should return null when channel ID and date not found', async () => {
-            let result = await dao.removeStandupParkingLotData("DDD", jan1, "Bob");
-            expect(result).toBeNull()
-            }
-        ),
-        it('should return null when channel ID and date found but no user', async () => {
-                let result = await dao.removeStandupParkingLotData("ABC", jan1, "Luda");
-                expect(result).toBeNull()
-            }
-        )
+            it('should return null when channel ID and date not found', async () => {
+                    let result = await dao.removeStandupParkingLotData("DDD", jan1, "Bob");
+                    expect(result).toBeNull()
+                }
+            ),
+            it('should return null when channel ID and date found but no user', async () => {
+                    let result = await dao.removeStandupParkingLotData("ABC", jan1, "Luda");
+                    expect(result).toBeNull()
+                }
+            )
     });
 
 });

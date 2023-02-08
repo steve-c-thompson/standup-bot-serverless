@@ -4,18 +4,17 @@ import {DynamoDB} from "aws-sdk";
 import {context, logger} from "../utils/context";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {createZeroUtcDate} from "../utils/datefunctions";
-import {DynamoDbStandupDataDao} from "./DynamoDbStandupDataDao";
+import {DynamoDbStandupDao} from "./DynamoDbStandupDao";
 
 /**
  * Use AWS DataMapper to get StandupParkingLotData, which depends on annotations in the StandupParkingLotData class.
  */
-export class DynamoDbStandupParkingLotDataDao extends DynamoDbStandupDataDao<StandupParkingLotData> implements StandupParkingLotDataDao {
+export class DynamoDbStandupParkingLotDataDao extends DynamoDbStandupDao<StandupParkingLotData> implements StandupParkingLotDataDao {
     constructor(client: DynamoDB) {
         super(client, new DataMapper(
             {client: client, tableNamePrefix: context.tableNamePrefix}
         ));
     }
-    // We cannot move this function into the base class because there is no `new T()` in TypeScript
     async getChannelDataForDate(channelId: string, date: Date): Promise<StandupParkingLotData | null> {
         const toFetch = new StandupParkingLotData();
         return super.getObject(toFetch, channelId, date);
@@ -62,7 +61,7 @@ export class DynamoDbStandupParkingLotDataDao extends DynamoDbStandupDataDao<Sta
             } else {
                 d = new StandupParkingLotData();
                 d.standupDate = date;
-                d.channelId = channelId;
+                d.id = channelId;
                 d.parkingLotData = [
                     {
                         content: parkingLotItems ? parkingLotItems : "",
@@ -102,7 +101,7 @@ export class DynamoDbStandupParkingLotDataDao extends DynamoDbStandupDataDao<Sta
      */
     static objectFactory(channelId: string, date: Date, parkingLotData: ParkingLotDataItem[]){
         let data = new StandupParkingLotData();
-        data.channelId = channelId;
+        data.id = channelId;
         data.parkingLotData = parkingLotData;
         data.standupDate = createZeroUtcDate(date);
         const ttl = new Date(data.standupDate);

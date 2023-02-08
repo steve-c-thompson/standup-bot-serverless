@@ -16,7 +16,12 @@ export class ParkingLotDataItem {
 
 @table(standupParkingLotTableName)
 export class StandupParkingLotData implements StandupData {
-    @hashKey() channelId: string;
+
+    public constructor(init?:Partial<StandupParkingLotData>) {
+        Object.assign(this, init);
+    }
+
+    @hashKey() id: string;
 
     @rangeKey({
             defaultProvider: () => {

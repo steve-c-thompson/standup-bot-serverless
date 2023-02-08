@@ -1,5 +1,5 @@
 export interface StandupData {
-    channelId: string;
+    id: string;
     standupDate?: Date;
     createdAt?: Date;
     updatedAt?: Date;

@@ -7,7 +7,6 @@ import {StandupData} from "./StandupData";
  */
 export abstract class StandupDataDaoImpl<T extends StandupData> implements StandupDataDao<T>{
 
-    abstract getChannelDataForDate(id: string, date: Date) : Promise<T | null>
     abstract putData(data: T) : Promise<T>
     abstract updateData(data: T) : Promise<T>
 
@@ -16,12 +15,15 @@ export abstract class StandupDataDaoImpl<T extends StandupData> implements Stand
             data.standupDate = new Date();
         }
         data.standupDate = createZeroUtcDate(data.standupDate);
+        this.validateAndSetTtl(data);
     }
 
+    /**
+     * Set TTL to always be standupDate + 1 day
+     * @param data
+     */
     validateAndSetTtl(data: T) {
-        if(!data.timeToLive) {
-            data.timeToLive = new Date(data.standupDate!);
-            data.timeToLive.setDate(data.standupDate!.getDate() + 1);
-        }
+        data.timeToLive = new Date(data.standupDate!);
+        data.timeToLive.setDate(data.standupDate!.getDate() + 1);
     }
 }

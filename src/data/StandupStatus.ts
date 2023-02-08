@@ -3,9 +3,14 @@ import {attribute, hashKey, rangeKey, table} from "@aws/dynamodb-data-mapper-ann
 import {standupStatusTableName} from "../utils/context";
 
 @table(standupStatusTableName)
-export class StandupStatusData implements StandupData{
+export class StandupStatus implements StandupData {
+
+    public constructor(init?:Partial<StandupStatus>) {
+        Object.assign(this, init);
+    }
+
     @hashKey()
-    channelId: string;
+    id: string; // A concatenation of channelId#userId
 
     @rangeKey({
         defaultProvider: () => {
@@ -14,9 +19,6 @@ export class StandupStatusData implements StandupData{
             return d;
         }
     }) standupDate?: Date; // epoch midnight for standup
-
-    @rangeKey()
-    userId: string;
 
     @attribute()
     yesterday: string;

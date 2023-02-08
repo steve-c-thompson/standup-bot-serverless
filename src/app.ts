@@ -74,7 +74,7 @@ const init = async () => {
         }
         else {
             try {
-                let payload = await slackBot.buildNewMessageModalView(body, client, logger);
+                let payload = await slackBot.buildNewMessageModalView(body, client);
                 const result = await client.views.open(
                     payload
                 );
@@ -122,6 +122,7 @@ const init = async () => {
             // If the message type is scheduled but there is no scheduleDateTime, this message
             // must be deleted and posted to channel
             if(viewInput.pm.messageType === "scheduled" && isEdit) {
+                // TODO update StandupStatus
                 // If this is an edit schedule message, delete the existing one and proceed
                  let command = new ChangeScheduledMessageCommand(viewInput.pm.messageId!,
                         viewInput.pm.channelId!,
@@ -132,10 +133,11 @@ const init = async () => {
             }
             // If we have a scheduleDateTime, schedule a new message
             if(viewInput.scheduleDateTime) {
+                // TODO if this is NOT and edit, need to see if a scheduled status already exists
                 // Schedule a new message
                 let scheduleStr = formatDateToPrintable(viewInput.scheduleDateTime, viewInput.timezone!);
 
-                const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client, logger);
+                const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client);
                 logger.info("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
@@ -162,7 +164,7 @@ const init = async () => {
             else {
                 if(isEdit && viewInput.pm.messageType === "edit") {
                     // We are editing a posted message, so update using slack's API
-                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client, logger) as ChatUpdateArguments;
+                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client) as ChatUpdateArguments;
                     // Update the message using the API
                     const result = await client.chat.update(chatMessageArgs);
                     // Print the result of the attempt
@@ -179,7 +181,7 @@ const init = async () => {
                 // Not editing an existing posted message, so save a new one
                 else {
                     viewInput.pm.messageType = "post";
-                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client, logger);
+                    const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client);
                     const result = await client.chat.postMessage(chatMessageArgs);
                     const cmd = new ChangePostedMessageCommand(result.message?.ts!, result.channel!, viewInput.pm.userId!);
                     const edit = slackBot.buildChatMessageEditDialog(cmd);
@@ -216,14 +218,14 @@ const init = async () => {
                     logger.info("Edit Request for scheduled message " + msgVal);
                     cmd = ChangeScheduledMessageCommand.buildFromString(msgVal);
                     triggerId = (body as BlockAction).trigger_id;
-                    result = await slackBot.buildModalViewForScheduleUpdate(cmd!, triggerId, client, logger);
+                    result = await slackBot.buildModalViewForScheduleUpdate(cmd!, triggerId, client);
                     await client.views.open(result);
                     break;
                 case ACTION_NAMES.get("EDIT_MESSAGE"):
                     logger.info("Edit Request for posted message " + msgVal);
                     cmd = ChangePostedMessageCommand.buildFromString(msgVal);
                     triggerId = (body as BlockAction).trigger_id;
-                    result = await slackBot.buildModalViewForPostUpdate(cmd!, triggerId, client, logger);
+                    result = await slackBot.buildModalViewForPostUpdate(cmd!, triggerId, client);
                     await client.views.open(result);
                     break;
             }
