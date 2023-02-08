@@ -3,25 +3,28 @@ import {ParkingLotDataItem, StandupParkingLotData} from "./StandupParkingLotData
 import {DynamoDB} from "aws-sdk";
 import {context, logger} from "../utils/context";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
+import {createZeroUtcDate} from "../utils/datefunctions";
+import {StandupDataDaoImpl} from "./StandupDataDaoImpl";
 
 /**
  * Use AWS DataMapper to get StandupParkingLotData, which depends on annotations in the StandupParkingLotData class.
  */
-export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDao {
+export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<StandupParkingLotData> implements StandupParkingLotDataDao {
     private readonly client: DynamoDB;
     private readonly mapper: DataMapper;
     constructor(client: DynamoDB) {
+        super();
         this.client = client
         this.mapper = new DataMapper(
             {client: this.client, tableNamePrefix: context.tableNamePrefix}
         );
     }
 
-    async getChannelParkingLotDataForDate(id: string, date: Date): Promise<StandupParkingLotData | null> {
+    async getChannelParkingLotDataForDate(channelId: string, date: Date): Promise<StandupParkingLotData | null> {
         const toFetch = new StandupParkingLotData();
-        toFetch.channelId = id;
-        toFetch.standupDate = DynamoDbStandupParkingLotDataDao.createZeroUtcDate(date);
-        logger.debug("Fetching standup data " + id + " with date " + toFetch.standupDate.getTime());
+        toFetch.channelId = channelId;
+        toFetch.standupDate = createZeroUtcDate(date);
+        logger.debug("Fetching standup data " + channelId + " with date " + toFetch.standupDate.getTime());
         return Promise.resolve(this.mapper.get(toFetch)).catch(() => {return null});
     }
 
@@ -106,42 +109,22 @@ export class DynamoDbStandupParkingLotDataDao implements StandupParkingLotDataDa
             }
         }
         else {
-            logger.info(`Could not find parking lot data for ${channelId} and ${date.toLocaleString()}`);
+            logger.info(`Could not find parking lot data for ${channelId} and ${date.toLocaleString()} for removal`);
         }
         return null;
     }
 
-    private validateAndSetStandupDate(data: StandupParkingLotData) {
-        if(!data.standupDate) {
-            data.standupDate = new Date();
-        }
-        data.standupDate = DynamoDbStandupParkingLotDataDao.createZeroUtcDate(data.standupDate);
-    }
-
-    private validateAndSetTtl(data: StandupParkingLotData) {
-        if(!data.timeToLive) {
-            data.timeToLive = new Date(data.standupDate!);
-            data.timeToLive.setDate(data.standupDate!.getDate() + 1);
-        }
-    }
-
-    private static createZeroUtcDate(date: Date): Date {
-        const d = new Date(date.getTime());
-        d.setUTCHours(0, 0, 0, 0);
-        return d;
-    }
-
     /**
-     * Simple object factory
+     * Simple object factory for testing
      * @param channelId
      * @param date
      * @param parkingLotData
      */
-    static standupParkingLotDataObjectFactory(channelId: string, date: Date, parkingLotData: ParkingLotDataItem[]){
+    static objectFactory(channelId: string, date: Date, parkingLotData: ParkingLotDataItem[]){
         let data = new StandupParkingLotData();
         data.channelId = channelId;
         data.parkingLotData = parkingLotData;
-        data.standupDate = this.createZeroUtcDate(date);
+        data.standupDate = createZeroUtcDate(date);
         const ttl = new Date(data.standupDate);
         ttl.setDate(ttl.getDate() + 1);
         data.timeToLive = ttl;

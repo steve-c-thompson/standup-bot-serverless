@@ -1,3 +1,5 @@
+import {PrivateMetadata} from "./PrivateMetadata";
+
 export class StandupViewData {
     pm: PrivateMetadata
     yesterday: string

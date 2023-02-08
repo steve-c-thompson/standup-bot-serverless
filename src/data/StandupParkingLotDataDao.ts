@@ -1,6 +1,7 @@
 import {StandupParkingLotData} from "./StandupParkingLotData";
+import {StandupDataDao} from "./StandupDataDao";
 
-export interface StandupParkingLotDataDao {
+export interface StandupParkingLotDataDao extends StandupDataDao<StandupParkingLotData> {
     getChannelParkingLotDataForDate(id: string, date: Date) : Promise<StandupParkingLotData | null>,
     putStandupParkingLotData(data: StandupParkingLotData) : Promise<StandupParkingLotData>,
     updateStandupParkingLotData(data: StandupParkingLotData) : Promise<StandupParkingLotData>,

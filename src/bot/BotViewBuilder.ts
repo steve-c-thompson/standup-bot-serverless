@@ -12,7 +12,6 @@ import {
 } from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {StandupMessageType} from "./SlackBot";
-import {formatDateToPrintable} from "../utils/datefunctions";
 import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
@@ -277,13 +276,10 @@ export class BotViewBuilder {
      * @param cmd
      * @param timezone`
      * @param args
+     * @param msg
      */
-    public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
-        const dateStr = formatDateToPrintable(cmd.postAt, timezone);
-        const msg = "Your status below is scheduled to send on\n " + dateStr;
-
-        const body: ChatPostEphemeralArguments = {
-            blocks: [
+    public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments, msg: string): Block[] {
+        const blocks = [
                 {
                     type: "section",
                     text: {
@@ -291,22 +287,19 @@ export class BotViewBuilder {
                         text: msg
                     },
                 },
-                this.buildChangeMessageActions(this.buildDeleteButton(cmd, ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE")!, "Delete Scheduled Status"), this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE")!,"Edit Scheduled Status")),
+                this.buildChangeMessageActions(this.buildDeleteButton(cmd, ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE")!, "Delete Scheduled Status"), this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE")!, "Edit Scheduled Status")),
                 {
                     type: "divider"
                 }
-            ],
-            channel: cmd.channelId,
-            user: cmd.userId,
-            text: msg
-        }
+            ];
+
         // Now add the message contents
-        body.blocks!.push(...args.blocks!);
-        body.blocks!.push(
+        blocks.push(...args.blocks!);
+        blocks!.push(
             {
                 type: "divider"
             });
-        return body;
+        return blocks;
     }
 
     private buildChangeMessageActions(...buttons : Button[]): ActionsBlock {
@@ -432,7 +425,7 @@ export class BotViewBuilder {
         if (parkingLotAttendees.length > 0) {
             try {
                 // Text output
-                const memberOutput = this.formatMembersForOutput(parkingLotAttendees, " ") + "\n";
+                const memberOutput = this.formatMembersForOutput(parkingLotAttendees, ", ") + "\n";
                 const context: ContextBlock = {
                     type: "context",
                     elements: []
@@ -477,7 +470,7 @@ export class BotViewBuilder {
             formatted += this.atMember(m.userId) + divider;
         });
 
-        return formatted.toString();
+        return formatted;
     }
 
     private atMember(id: string) {
@@ -497,11 +490,9 @@ export class BotViewBuilder {
     /**
      * Create an ephemeral message containing an Edit button
      * @param cmd
+     * @param msg
      */
-    public buildChatMessageEditDialog(cmd: MessageCommand): ChatPostEphemeralArguments {
-        const channelId = cmd.channelId;
-        const userId = cmd.userId;
-
+    public buildChatMessageEditBlocks(cmd: MessageCommand, msg: string): Block[] {
         const blocks: KnownBlock[] = [{
             type: "section",
             text: {
@@ -509,15 +500,9 @@ export class BotViewBuilder {
                 text: "You may edit your status"
             }
         }];
-        const msg = "Edit status"
 
-        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_MESSAGE")!,"Edit Status")));
-        return {
-            channel: channelId,
-            user: userId,
-            blocks: blocks,
-            text: msg
-        }
+        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_MESSAGE")!,msg)));
+        return blocks;
     }
 
     public buildParkingLotDisplayItems(pItems: ParkingLotDisplayItem[]): string {

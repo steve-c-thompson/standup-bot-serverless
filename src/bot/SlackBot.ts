@@ -15,7 +15,7 @@ import {StandupParkingLotDataDao} from "../data/StandupParkingLotDataDao";
 import {StandupParkingLotData} from "../data/StandupParkingLotData";
 import {BotViewBuilder, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {adjustDateAndTimeForTimezone} from "../utils/datefunctions";
+import {adjustDateAndTimeForTimezone, formatDateToPrintable} from "../utils/datefunctions";
 import {ChangePostedMessageCommand, ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
@@ -296,11 +296,29 @@ export class SlackBot {
     }
 
     public buildChatMessageEditDialog(cmd: MessageCommand) {
-        return this.viewBuilder.buildChatMessageEditDialog(cmd);
+        const channelId = cmd.channelId;
+        const userId = cmd.userId;
+        const msg = "Edit Status";
+        const blocks = this.viewBuilder.buildChatMessageEditBlocks(cmd, msg);
+        return {
+            channel: channelId,
+            user: userId,
+            blocks: blocks,
+            text: msg
+        }
     }
 
     public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments) : ChatPostEphemeralArguments {
-        return this.viewBuilder.buildScheduledMessageDialog(cmd, timezone, args);
+        const dateStr = formatDateToPrintable(cmd.postAt, timezone);
+        const msg = "Your status below is scheduled to send on\n " + dateStr;
+
+        const blocks = this.viewBuilder.buildScheduledMessageDialog(cmd, timezone, args, msg);
+        return {
+            channel: cmd.channelId,
+            user: cmd.userId,
+            text: msg,
+            blocks: blocks
+        }
     }
 
     public buildEphemeralContextMessage(channelId: string, userId: string, message: string): ChatPostEphemeralArguments {

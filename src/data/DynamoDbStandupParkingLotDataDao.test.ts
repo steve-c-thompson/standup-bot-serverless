@@ -1,16 +1,16 @@
 import {DynamoDbStandupParkingLotDataDao} from "./DynamoDbStandupParkingLotDataDao";
-import {context, standupParkingLotTableName} from "../utils/context";
-import {dbCleanup, jan1, jan2, testParkingLotData} from "../test/scripts/create-dynamodb";
+import {context} from "../utils/context";
+import {createStandupParkingLotData, jan1, jan2, testParkingLotData} from "../test/scripts/create-dynamodb";
 import {StandupParkingLotData} from "./StandupParkingLotData";
 
 // Make sure the database is in an acceptable state
 beforeEach(async () => {
-    await dbCleanup();
+    await createStandupParkingLotData();
 });
 
 // Now leave it how we found it
 afterAll( async () => {
-    await dbCleanup();
+    await createStandupParkingLotData();
 })
 describe(DynamoDbStandupParkingLotDataDao.name, () => {
     const dao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
@@ -58,7 +58,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 expect(d?.timeToLive?.getTime()).toBeGreaterThan(d.standupDate?.getTime()!);
             });
             it('and zero out standupDate', async () => {
-                let d = DynamoDbStandupParkingLotDataDao.standupParkingLotDataObjectFactory("ABC", jan1, []);
+                let d = DynamoDbStandupParkingLotDataDao.objectFactory("ABC", jan1, []);
                 let standupDate = new Date('December 17, 2015 03:24:00');
                 d.standupDate = standupDate;
                 d = await dao.updateStandupParkingLotData(d);
@@ -69,7 +69,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
             });
 
             it('fields including updatedAt but not createdAt or timeToLive', async () => {
-                let d = DynamoDbStandupParkingLotDataDao.standupParkingLotDataObjectFactory("ABC", jan2, [
+                let d = DynamoDbStandupParkingLotDataDao.objectFactory("ABC", jan2, [
                     {
                         userId: "new",
                         content: "new content",
