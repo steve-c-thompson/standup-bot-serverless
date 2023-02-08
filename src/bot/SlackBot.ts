@@ -247,7 +247,7 @@ export class SlackBot {
     }
 
     public async buildParkingLotDisplayData(channelId: string, date: Date, client: WebClient): Promise<string> {
-        let p: StandupParkingLotData | null = await this.dao.getChannelParkingLotDataForDate(channelId, date);
+        let p: StandupParkingLotData | null = await this.dao.getChannelDataForDate(channelId, date);
         let displayItems: ParkingLotDisplayItem[] = [];
         if (p) {
             let proms = p.parkingLotData!.map(async i => {

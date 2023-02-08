@@ -6,6 +6,11 @@ import {StandupData} from "./StandupData";
  * Abstract base class for objects that have a standupDate and timeToLive
  */
 export abstract class StandupDataDaoImpl<T extends StandupData> implements StandupDataDao<T>{
+
+    abstract getChannelDataForDate(id: string, date: Date) : Promise<T | null>
+    abstract putData(data: T) : Promise<T>
+    abstract updateData(data: T) : Promise<T>
+
     validateAndSetStandupDate(data: T) {
         if(!data.standupDate) {
             data.standupDate = new Date();

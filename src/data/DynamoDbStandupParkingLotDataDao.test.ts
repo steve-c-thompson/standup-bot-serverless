@@ -22,7 +22,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
 
     describe('should retrieve', () => {
         it("an existing entity", async () => {
-            let r = await dao.getChannelParkingLotDataForDate("ABC", jan1);
+            let r = await dao.getChannelDataForDate("ABC", jan1);
             expect(r).toBeTruthy();
             expect(r?.channelId).toEqual("ABC");
             expect(r?.createdAt).toBeTruthy();
@@ -32,14 +32,14 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
             expect(r?.parkingLotData).toHaveLength(2);
         });
         it("an existing entity with ttl day plus one", async () => {
-            let r = await dao.getChannelParkingLotDataForDate("ABC", jan1);
+            let r = await dao.getChannelDataForDate("ABC", jan1);
             expect(r).toBeTruthy();
             expect(r?.channelId).toEqual("ABC");
             expect(r?.timeToLive).toEqual(jan2Zero);
             expect(r?.parkingLotData).toHaveLength(2);
         });
         it("null if no data for that Year Month Day", async () => {
-            let r = await dao.getChannelParkingLotDataForDate("ABC", jan2);
+            let r = await dao.getChannelDataForDate("ABC", jan2);
             expect(r).toBeNull();
         })
     });
@@ -50,7 +50,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 d.channelId = "ABC";
                 d.standupDate = jan1;
                 d.parkingLotData = undefined; // set the data to missing value
-                d = await dao.updateStandupParkingLotData(d);
+                d = await dao.updateData(d);
                 expect(d?.parkingLotData).toHaveLength(2);
                 expect(d?.createdAt).toBeTruthy();
                 expect(d?.updatedAt).toBeTruthy();
@@ -61,7 +61,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 let d = DynamoDbStandupParkingLotDataDao.objectFactory("ABC", jan1, []);
                 let standupDate = new Date('December 17, 2015 03:24:00');
                 d.standupDate = standupDate;
-                d = await dao.updateStandupParkingLotData(d);
+                d = await dao.updateData(d);
                 expect(d?.standupDate?.getUTCDate()).toEqual(standupDate.getUTCDate());
                 expect(d?.standupDate?.getUTCDay()).toEqual(standupDate.getUTCDay());
                 expect(d?.standupDate?.getUTCHours()).toEqual(0);
@@ -81,7 +81,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
                 d.createdAt = createdAt;
                 d.updatedAt = createdAt;
                 d.timeToLive = ttl;
-                d = await dao.updateStandupParkingLotData(d);
+                d = await dao.updateData(d);
                 expect(d?.parkingLotData).toEqual([{
                     userId: "new",
                     content: "new content",
@@ -105,7 +105,7 @@ describe(DynamoDbStandupParkingLotDataDao.name, () => {
         }];
 
         try {
-            d = await dao.putStandupParkingLotData(d);
+            d = await dao.putData(d);
         } catch (e) {
             console.log(e);
         }

@@ -4,41 +4,21 @@ import {DynamoDB} from "aws-sdk";
 import {context, logger} from "../utils/context";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {createZeroUtcDate} from "../utils/datefunctions";
-import {StandupDataDaoImpl} from "./StandupDataDaoImpl";
+import {DynamoDbStandupDataDao} from "./DynamoDbStandupDataDao";
 
 /**
  * Use AWS DataMapper to get StandupParkingLotData, which depends on annotations in the StandupParkingLotData class.
  */
-export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<StandupParkingLotData> implements StandupParkingLotDataDao {
-    private readonly client: DynamoDB;
-    private readonly mapper: DataMapper;
+export class DynamoDbStandupParkingLotDataDao extends DynamoDbStandupDataDao<StandupParkingLotData> implements StandupParkingLotDataDao {
     constructor(client: DynamoDB) {
-        super();
-        this.client = client
-        this.mapper = new DataMapper(
-            {client: this.client, tableNamePrefix: context.tableNamePrefix}
-        );
+        super(client, new DataMapper(
+            {client: client, tableNamePrefix: context.tableNamePrefix}
+        ));
     }
-
-    async getChannelParkingLotDataForDate(channelId: string, date: Date): Promise<StandupParkingLotData | null> {
+    // We cannot move this function into the base class because there is no `new T()` in TypeScript
+    async getChannelDataForDate(channelId: string, date: Date): Promise<StandupParkingLotData | null> {
         const toFetch = new StandupParkingLotData();
-        toFetch.channelId = channelId;
-        toFetch.standupDate = createZeroUtcDate(date);
-        logger.debug("Fetching standup data " + channelId + " with date " + toFetch.standupDate.getTime());
-        return Promise.resolve(this.mapper.get(toFetch)).catch(() => {return null});
-    }
-
-    async putStandupParkingLotData(data: StandupParkingLotData): Promise<StandupParkingLotData> {
-        this.validateAndSetStandupDate(data);
-        this.validateAndSetTtl(data);
-        logger.debug("Storing standup data " + data.channelId + " with date " + data.standupDate?.getTime());
-        return this.mapper.put(data);
-    }
-
-    async updateStandupParkingLotData(data: StandupParkingLotData): Promise<StandupParkingLotData> {
-        data.updatedAt = new Date();
-        this.validateAndSetStandupDate(data);
-        return this.mapper.update(data, {onMissing: "skip"});
+        return super.getObject(toFetch, channelId, date);
     }
 
     /**
@@ -57,7 +37,7 @@ export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<Standup
                                       parkingLotAttendees: string[]): Promise<StandupParkingLotData | null> {
         if (parkingLotItems || parkingLotAttendees.length > 0) {
             // check if this object already exists
-            let d = await this.getChannelParkingLotDataForDate(channelId, date);
+            let d = await this.getChannelDataForDate(channelId, date);
             if (d) {
                 // updating, add or replace item for user
                 let foundIndex = d.parkingLotData!.findIndex(p => {
@@ -78,7 +58,7 @@ export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<Standup
                     });
                 }
 
-                return this.updateStandupParkingLotData(d);
+                return this.updateData(d);
             } else {
                 d = new StandupParkingLotData();
                 d.standupDate = date;
@@ -90,14 +70,14 @@ export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<Standup
                         attendees: parkingLotAttendees
                     }
                 ]
-                return this.putStandupParkingLotData(d);
+                return this.putData(d);
             }
         }
         return null;
     }
 
     async removeStandupParkingLotData(channelId: string, date: Date, userId: string): Promise<StandupParkingLotData | null> {
-        let d = await this.getChannelParkingLotDataForDate(channelId, date);
+        let d = await this.getChannelDataForDate(channelId, date);
         if(d) {
             // updating, add or replace item for user
             let foundIndex = d.parkingLotData!.findIndex(p => {
@@ -105,7 +85,7 @@ export class DynamoDbStandupParkingLotDataDao extends StandupDataDaoImpl<Standup
             });
             if (foundIndex >= 0) {
                 d.parkingLotData!.splice(foundIndex, 1);
-               return this.updateStandupParkingLotData(d);
+               return this.updateData(d);
             }
         }
         else {
