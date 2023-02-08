@@ -22,17 +22,19 @@ import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
 import {logger} from "../utils/context";
+import {StandupStatusDao} from "../data/StandupStatusDao";
 
 export type StandupMessageType = "scheduled" | "post" | "ephemeral" | "edit";
 
 export class SlackBot {
     private parkingLotDataDao: StandupParkingLotDataDao;
-
+    private statusDao: StandupStatusDao;
 
     private viewBuilder = new BotViewBuilder();
 
-    constructor(parkingLotDataDao: StandupParkingLotDataDao) {
+    constructor(parkingLotDataDao: StandupParkingLotDataDao, statusDao: StandupStatusDao) {
         this.parkingLotDataDao = parkingLotDataDao;
+        this.statusDao = statusDao;
     }
 
     /**
@@ -199,6 +201,7 @@ export class SlackBot {
     public async createChatMessageAndSaveData(viewInput: StandupViewData, client: WebClient):
         Promise<ChatPostMessageArguments | ChatScheduleMessageArguments | ChatUpdateArguments> {
 
+        // TODO both creating the message and saving data doesn't feel right. We only need UserInfos for display
         const channelId = viewInput.pm.channelId!;
         const userId = viewInput.pm.userId!;
         const ts = viewInput.pm.messageId;
@@ -215,7 +218,8 @@ export class SlackBot {
 
         try {
             const saveDate = viewInput.scheduleDateTime ? new Date(viewInput.scheduleDateTime) : new Date();
-            await this.saveParkingLotData(channelId, saveDate, userId, viewInput.parkingLot, memberInfos);
+            await this.saveParkingLotData(channelId, saveDate, userId, viewInput.parkingLot, viewInput.attendees);
+            // TODO translate viewInput to status data and save, overwriting any existing
         } catch (e) {
             logger.error(e);
         }
@@ -256,11 +260,9 @@ export class SlackBot {
                                     date: Date,
                                     userId: string,
                                     parkingLotItems: string | null | undefined,
-                                    parkingLotAttendees: UserInfo[]) {
-        const pla = parkingLotAttendees.map(u => {
-            return u.userId!;
-        })
-        await this.parkingLotDataDao.upsertStandupParkingLotData(channelId, date, userId, parkingLotItems, pla);
+                                    parkingLotAttendees: string[] = []) {
+
+        await this.parkingLotDataDao.upsertStandupParkingLotData(channelId, date, userId, parkingLotItems, parkingLotAttendees);
     }
 
     private async queryUsers(users: string[], client: WebClient): Promise<UserInfo[]> {

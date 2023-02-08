@@ -345,12 +345,12 @@ export class BotViewBuilder {
      * Create the output to post in chat.
      * @param: messageType
      * @param messageType
-     * @param userInfo
+     * @param userInfo Object that allows us access to user's image and name
      * @param yesterday
      * @param today
      * @param parkingLotItems
      * @param pullRequests
-     * @param parkingLotAttendees
+     * @param parkingLotAttendees UserInfo objects so we can get each user's image and name
      */
     public buildChatMessageOutputBlocks(messageType: StandupMessageType,
                                         userInfo: UserInfo,

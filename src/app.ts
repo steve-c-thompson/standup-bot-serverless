@@ -9,6 +9,7 @@ import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {formatDateToPrintable} from "./utils/datefunctions";
 import {ChangePostedMessageCommand, ChangeScheduledMessageCommand} from "./bot/Commands";
 import {ACTION_NAMES} from "./bot/ViewConstants";
+import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -22,9 +23,9 @@ const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
     const slackBotToken = await dataSource.slackToken();
 
-    const dao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
-
-    const slackBot: SlackBot = new SlackBot(dao);
+    const parkingLotDataDao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
+    const statusDao = new DynamoDbStandupStatusDao(context.dynamoDbClient);
+    const slackBot: SlackBot = new SlackBot(parkingLotDataDao, statusDao);
 
     awsLambdaReceiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
@@ -122,7 +123,6 @@ const init = async () => {
             // If the message type is scheduled but there is no scheduleDateTime, this message
             // must be deleted and posted to channel
             if(viewInput.pm.messageType === "scheduled" && isEdit) {
-                // TODO update StandupStatus
                 // If this is an edit schedule message, delete the existing one and proceed
                  let command = new ChangeScheduledMessageCommand(viewInput.pm.messageId!,
                         viewInput.pm.channelId!,
@@ -133,7 +133,7 @@ const init = async () => {
             }
             // If we have a scheduleDateTime, schedule a new message
             if(viewInput.scheduleDateTime) {
-                // TODO if this is NOT and edit, need to see if a scheduled status already exists
+                // TODO what if this is a "new" scheduled message (not edit) but scheduled exists? Can we look in StandupStatus?
                 // Schedule a new message
                 let scheduleStr = formatDateToPrintable(viewInput.scheduleDateTime, viewInput.timezone!);
 
@@ -153,6 +153,7 @@ const init = async () => {
                     viewInput.pm.channelId!,
                     viewInput.scheduleDateTime,
                     viewInput.pm.userId!)
+                // TODO could update StandupStatus with messageID?
                 command.messageId = msgId;
                 let confMessage = slackBot.buildScheduledMessageDialog(command,
                     viewInput.timezone!,
@@ -180,6 +181,7 @@ const init = async () => {
                 }
                 // Not editing an existing posted message, so save a new one
                 else {
+                    // TODO what if scheduled message exists? Can we look in StandupStatus?
                     viewInput.pm.messageType = "post";
                     const chatMessageArgs = await slackBot.createChatMessageAndSaveData(viewInput, client);
                     const result = await client.chat.postMessage(chatMessageArgs);
