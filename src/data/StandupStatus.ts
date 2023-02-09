@@ -41,6 +41,9 @@ export class StandupStatus implements StandupData {
     parkingLotAttendees?: string[] = [];
 
     @attribute()
+    pullRequests?: string;
+
+    @attribute()
     scheduleDateStr?: string;
 
     @attribute()

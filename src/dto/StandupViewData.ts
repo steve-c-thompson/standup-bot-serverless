@@ -11,4 +11,8 @@ export class StandupViewData {
     timezone?: string
     dateStr?: string | null | undefined
     timeStr?: string | null | undefined
+
+    public constructor(init?:Partial<StandupViewData>) {
+        Object.assign(this, init);
+    }
 }

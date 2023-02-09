@@ -10,8 +10,8 @@ import {
     SectionBlock
 } from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {StandupMessageType} from "./SlackBot";
-import {ChangeScheduledMessageCommand, MessageCommand} from "./Commands";
+import {StandupDialogMessageType} from "./SlackBot";
+import {ChangeMessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
@@ -278,7 +278,7 @@ export class BotViewBuilder {
      * @param args
      * @param msg
      */
-    public buildScheduledMessageDialog(cmd: ChangeScheduledMessageCommand, timezone: string, args: ChatScheduleMessageArguments, msg: string): Block[] {
+    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, timezone: string, args: ChatScheduleMessageArguments, msg: string): Block[] {
         const blocks = [
                 {
                     type: "section",
@@ -310,7 +310,7 @@ export class BotViewBuilder {
         };
     }
 
-    private buildDeleteButton(cmd: MessageCommand, actionId:string, msg: string): Button{
+    private buildDeleteButton(cmd: ChangeMessageCommand, actionId:string, msg: string): Button{
         return {
             type: "button",
             style: "danger",
@@ -329,7 +329,7 @@ export class BotViewBuilder {
         };
     }
 
-    private buildEditButton(cmd: MessageCommand, actionId: string, msg: string): Button {
+    private buildEditButton(cmd: ChangeMessageCommand, actionId: string, msg: string): Button {
         return {
             type: "button",
             text: {
@@ -352,7 +352,7 @@ export class BotViewBuilder {
      * @param pullRequests
      * @param parkingLotAttendees UserInfo objects so we can get each user's image and name
      */
-    public buildChatMessageOutputBlocks(messageType: StandupMessageType,
+    public buildChatMessageOutputBlocks(messageType: StandupDialogMessageType,
                                         userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
@@ -490,7 +490,7 @@ export class BotViewBuilder {
      * @param cmd
      * @param msg
      */
-    public buildChatMessageEditBlocks(cmd: MessageCommand, msg: string): Block[] {
+    public buildChatMessageEditBlocks(cmd: ChangeMessageCommand, msg: string): Block[] {
         const blocks: KnownBlock[] = [{
             type: "section",
             text: {

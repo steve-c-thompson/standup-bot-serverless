@@ -22,6 +22,7 @@ beforeEach(async () => {
         yesterday: "yesterday",
         parkingLot: "parking lot",
         parkingLotAttendees: ["Peter", "Paul", "Mary"],
+        pullRequests: "pull requests",
         scheduleDateStr: "10/20/2020",
         scheduleTimeStr: "09:08",
         messageId: "12345",
@@ -49,6 +50,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status?.yesterday).toEqual("yesterday");
             expect(status?.parkingLot).toEqual("parking lot");
             expect(status?.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(status?.pullRequests).toEqual("pull requests");
             expect(status?.scheduleDateStr).toEqual("10/20/2020");
             expect(status?.scheduleTimeStr).toEqual("09:08");
             expect(status?.messageId).toEqual("12345");
@@ -73,6 +75,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status?.yesterday).toEqual("yesterday");
             expect(status?.parkingLot).toEqual("parking lot");
             expect(status?.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(status?.pullRequests).toEqual("pull requests");
             expect(status?.scheduleDateStr).toEqual("10/20/2020");
             expect(status?.scheduleTimeStr).toEqual("09:08");
         });
@@ -97,6 +100,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
                 yesterday: "yesterday",
                 parkingLot: "parking lot",
                 parkingLotAttendees: ["Peter", "Paul", "Mary"],
+                pullRequests: "pull requests",
                 scheduleDateStr: "10/20/2020",
                 scheduleTimeStr: "09:08",
                 messageId: "12345",
@@ -114,6 +118,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.yesterday).toEqual("yesterday");
             expect(saved.parkingLot).toEqual("parking lot");
             expect(saved.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(saved.pullRequests).toEqual("pull requests");
             expect(saved.scheduleDateStr).toEqual("10/20/2020");
             expect(saved.scheduleTimeStr).toEqual("09:08");
             expect(saved.messageId).toEqual("12345");
@@ -145,6 +150,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.yesterday).toEqual("yesterday2");
             expect(saved.parkingLot).toEqual("parking lot2");
             expect(saved.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary", "John"]));
+            expect(saved.pullRequests).toBeUndefined();
             expect(saved.scheduleDateStr).toEqual("10/20/2021");
             expect(saved.scheduleTimeStr).toEqual("09:09");
             expect(saved.messageId).toEqual("123456");
@@ -167,53 +173,3 @@ describe(DynamoDbStandupStatusDao.name, () => {
         });
     });
 });
-
-
-// describe(DynamoDbStandupStatusDao.name, () => {
-//     const dao = new DynamoDbStandupStatusDao(context.dynamoDbClient);
-//
-//     describe("should retrive", () => {
-//         it("an existing entity by nonzero date", async () => {
-//             const status = await dao.getChannelDataForDate("ABC", jan1, "Ronnie");
-//             expect(status).toBeTruthy();
-//             expect(status?.id).toEqual("ABC#Ronnie");
-//             expect(status?.standupDate).toEqual(jan1Zero);
-//             expect(status?.today).toEqual("today");
-//             expect(status?.yesterday).toEqual("yesterday");
-//             expect(status?.parkingLot).toEqual("parking lot");
-//             expect(status?.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
-//             expect(status?.scheduleDateStr).toEqual("10/20/2020");
-//             expect(status?.scheduleTimeStr).toEqual("09:08");
-//             expect(status?.timeToLive?.getTime()).toBeGreaterThan(jan1Zero.getTime());
-//         });
-//         it("null if not found", async () => {
-//             const status = await dao.getChannelDataForDate("ABC", jan2, "Ronnie");
-//             expect(status).toBeNull();
-//         });
-//     });
-//
-//     describe("should put", () => {
-//         it("an entity with zeroed createDate and ttl = create + 1 day", async () => {
-//             const standupDate = new Date();
-//             const zeroDate = new Date();
-//             zeroDate.setUTCHours(0, 0, 0, 0);
-//             const expectedTtl = new Date(zeroDate.getTime());
-//             expectedTtl.setDate(zeroDate.getDate() + 1);
-//
-//             const status: StandupStatus = new StandupStatus({
-//                 id: "ABC#Ricky",
-//                 standupDate: standupDate, // expect this to be zeroed
-//                 today: "today",
-//                 yesterday: "yesterday",
-//                 parkingLot: "parking lot",
-//                 parkingLotAttendees: ["Peter", "Paul", "Mary"],
-//                 scheduleDateStr: "10/20/2020",
-//                 scheduleTimeStr: "09:08"
-//             });
-//             const saved = await dao.putData(status);
-//             expect(saved).toBeTruthy();
-//             expect(saved.standupDate).toEqual(zeroDate);
-//             expect(saved.timeToLive).toEqual(expectedTtl);
-//         });
-//     });
-// });
