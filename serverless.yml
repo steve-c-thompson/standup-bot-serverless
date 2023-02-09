@@ -13,27 +13,6 @@ provider:
   logRetentionInDays: 5
 resources:
   Resources:
-    ParkingLotDynamoDbTable:
-      Type: 'AWS::DynamoDB::Table'
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: "id"
-            AttributeType: "S"
-          - AttributeName: "standupDate"
-            AttributeType: "N"
-        KeySchema:
-          - AttributeName: "id"
-            KeyType: "HASH"
-          - AttributeName: "standupDate"
-            KeyType: "RANGE"
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:provider.stage}_STANDUP_PARKING_LOT_DATA
-        TimeToLiveSpecification:
-          AttributeName: timeToLive
-          Enabled: true
     StatusDynamoDbTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain

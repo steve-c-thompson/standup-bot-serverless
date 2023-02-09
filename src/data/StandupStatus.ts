@@ -1,11 +1,10 @@
-import {StandupData} from "./StandupData";
 import {attribute, hashKey, rangeKey, table} from "@aws/dynamodb-data-mapper-annotations";
 import {standupStatusTableName} from "../utils/context";
 
 export type StandupStatusType = "posted" | "scheduled";
 
 @table(standupStatusTableName)
-export class StandupStatus implements StandupData {
+export class StandupStatus {
 
     public constructor(init?:Partial<StandupStatus>) {
         Object.assign(this, init);

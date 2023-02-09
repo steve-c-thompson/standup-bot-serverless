@@ -4,7 +4,6 @@ import winston, {createLogger} from "winston";
 import {DynamoDB} from "aws-sdk";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
-export const standupParkingLotTableName = "STANDUP_PARKING_LOT_DATA";
 export const standupStatusTableName = "STANDUP_STATUS";
 export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
