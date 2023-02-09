@@ -2,6 +2,8 @@ import {StandupData} from "./StandupData";
 import {attribute, hashKey, rangeKey, table} from "@aws/dynamodb-data-mapper-annotations";
 import {standupStatusTableName} from "../utils/context";
 
+export type StandupStatusType = "posted" | "scheduled";
+
 @table(standupStatusTableName)
 export class StandupStatus implements StandupData {
 
@@ -10,15 +12,21 @@ export class StandupStatus implements StandupData {
     }
 
     @hashKey()
-    id: string; // A concatenation of channelId#userId
+    id: string; // A concatenation of channelId#standupDate.getTime(), expected to be epoch midnight for standup
 
-    @rangeKey({
+    @rangeKey()
+    userId: string;
+
+    @attribute({
         defaultProvider: () => {
             const d = new Date();
             d.setUTCHours(0, 0, 0, 0);
             return d;
         }
-    }) standupDate?: Date; // epoch midnight for standup
+    }) standupDate: Date; // epoch midnight for standup, used in ID
+
+    @attribute()
+    channelId: string;
 
     @attribute()
     yesterday: string;
@@ -48,4 +56,11 @@ export class StandupStatus implements StandupData {
             return date;
         }
     }) timeToLive?: Date;
+
+    // The message ID if this message was sent or scheduled
+    @attribute()
+    messageId?: string;
+
+    @attribute()
+    messageType: StandupStatusType;
 }

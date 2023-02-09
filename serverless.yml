@@ -41,12 +41,12 @@ resources:
         AttributeDefinitions:
           - AttributeName: "id"
             AttributeType: "S"
-          - AttributeName: "standupDate"
-            AttributeType: "N"
+          - AttributeName: "userId"
+            AttributeType: "S"
         KeySchema:
           - AttributeName: "id"
             KeyType: "HASH"
-          - AttributeName: "standupDate"
+          - AttributeName: "userId"
             KeyType: "RANGE"
         ProvisionedThroughput:
           ReadCapacityUnits: 1

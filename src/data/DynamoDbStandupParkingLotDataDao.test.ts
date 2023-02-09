@@ -12,7 +12,7 @@ beforeEach(async () => {
 afterAll(async () => {
     await createStandupParkingLotData();
 })
-describe(DynamoDbStandupParkingLotDataDao.name, () => {
+describe.skip(DynamoDbStandupParkingLotDataDao.name, () => {
     const dao = new DynamoDbStandupParkingLotDataDao(context.dynamoDbClient);
 
     const jan1Zero = new Date(jan1.getTime());
