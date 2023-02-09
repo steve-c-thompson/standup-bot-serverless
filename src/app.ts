@@ -121,10 +121,10 @@ const init = async () => {
             // If the message type is scheduled but there is no scheduleDateTime, this message
             // must be deleted and posted to channel
             if(viewInput.pm.messageType === "scheduled" && isEdit) {
-                // If this is an edit schedule message, delete the existing one and proceed
+                // If this is an edit schedule message, delete the existing one based on its messageDate
                  let command = new ChangeMessageCommand(viewInput.pm.messageId!,
                         viewInput.pm.channelId!,
-                        viewInput.scheduleDateTime!,
+                        viewInput.pm.messageDate!,
                         viewInput.pm.userId!);
                  const result = await slackBot.deleteScheduledMessage(command, client, logger);
                  await client.chat.postEphemeral(result as ChatPostEphemeralArguments);

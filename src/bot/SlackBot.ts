@@ -327,7 +327,8 @@ export class SlackBot {
      * @param logger
      */
     public async deleteScheduledMessage(command: ChangeMessageCommand, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments | string> {
-        logger.info(`Deleting message ${command?.messageId} for channel ${command?.channelId}`);
+        logger.info(`Deleting message ${command?.messageId} for channel ${command?.channelId} on date ${command?.postAt} for user ${command?.userId}`);
+
         if (command) {
             try {
                 const result = await client.chat.deleteScheduledMessage(
@@ -353,7 +354,6 @@ export class SlackBot {
                 throw e;
             } finally {
                 // also clean up the parking lot items
-                logger.info(`Removing Standup Parking Lot Data ${command.channelId} ${command.postAt} ${command.userId}`);
                 await this.statusDao.removeStandupStatusData(command.channelId, new Date(command.postAt!), command.userId);
             }
         }
