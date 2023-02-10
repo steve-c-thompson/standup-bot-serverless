@@ -17,6 +17,14 @@ let awsLambdaReceiver: AwsLambdaReceiver;
 
 const logLevel = LogLevel.INFO;
 
+/**
+ * This is a slack bot that allows users to enter their standup status.
+ *
+ * This uses the @slack/bolt framework to handle the slack events and interactions.
+ * https://slack.dev/bolt-js/tutorial/getting-started
+ *
+ * See the README for how to configure the bot
+ */
 const init = async () => {
     logger.debug("Executing async init");
     const signingSecret = await dataSource.slackSigningSecret();
@@ -25,6 +33,7 @@ const init = async () => {
     const statusDao = new DynamoDbStandupStatusDao(context.dynamoDbClient);
     const slackBot: SlackBot = new SlackBot(statusDao);
 
+    // Receiver provided by the @slack/bolt framework
     awsLambdaReceiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
         logLevel: logLevel
@@ -35,6 +44,11 @@ const init = async () => {
         logLevel: logLevel
     });
 
+    /**
+     * Handle the /standup command. This launches the modal view.
+     *
+     * Note: ideally we would check if the bot is in the channel, but that is not possible with the current slack api.
+     */
     app.command("/standup", async ({ack, body, client, logger}) => {
         await ack();
 
@@ -88,7 +102,9 @@ const init = async () => {
      * Main handler for view submissions. It first checks if the bot is in the channel, returning an error if not. It
      * then acknowledges the request.
      *
-     * Much of the functionality relies on `PrivateMetaData.messageType` as well as data received in the submission.
+     * Much of the functionality relies on `PrivateMetaData.messageType` to determine what output to create,
+     * as well as data received in the submission. Data is crucial because it identifies the message to update or delete.
+     *
      * If a messageId comes in from the metadata, assume this is a status we must update (posted) or delete (scheduled).
      *
      * If there is no messageId, create new statuses.
@@ -179,7 +195,7 @@ const init = async () => {
                     }
                     // Print the result of the attempt
                     if(result.ok){
-                        console.log(`Message ${result.ts} updated`);
+                        logger.info(`Message ${result.ts} updated`);
                         const msg = await slackBot.buildEphemeralContextMessage(result.channel!, viewInput.pm.userId!, "Your status was updated");
                         await client.chat.postEphemeral(msg);
                     }
@@ -190,11 +206,11 @@ const init = async () => {
                 }
                 // Not editing an existing posted message, but does one exist
                 else {
-
                     viewInput.pm.messageType = "post";
                     const chatMessageArgs = await slackBot.createChatMessage(viewInput, client);
                     const result = await client.chat.postMessage(chatMessageArgs);
                     const standupDate = new Date();
+                    viewInput.pm.messageId = result.ts!;
                     try {
                         await slackBot.saveStatusData(viewInput, standupDate, "posted");
                     } catch (e) {
@@ -218,6 +234,9 @@ const init = async () => {
         }
     });
 
+    /**
+     * Handle the action of a button press from the change-msg block in the posted message.
+     */
     app.action({block_id: "change-msg"}, async ({body,  ack, say, logger, client }) => {
         try {
             await ack();

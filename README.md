@@ -13,6 +13,8 @@ Add bot to channels where you wish to use it.
 
 ![Slack Integration](img/slack_integration.png)
 
+Or invite the bot to the channel with `@Standup`.
+
 ## Usage - Slack
 ```sh
 /standup help
@@ -61,7 +63,7 @@ In the app's _Basic Settings_ copy the value for _Signing Secret_:
 
 ![Signing secret](img/signing_secret.png)
 
-## Local Testing
+## Local Development
 Testing locally requires Docker, and setting the following environment variables in a `.env` file. These are the same values found in the **Secrets** section of this document.
 
 * `SLACK_STANDUP_TOKEN`
@@ -71,7 +73,9 @@ Deploy to Docker with the following command:
 ```sh
 npm run serverless-localstack
 ```
-This retrieves the local environment variables and creates a secret and DynamoDB table in the Localstack instance.
+This retrieves the local environment variables and creates secrets and a DynamoDB table in the Localstack instance.
+
+Localstack runs on port `4566`.
 
 ### Script Permissions
 Localstack is loaded with scripts in `src/test/scripts`. These may need updated permissions to execute.
@@ -90,6 +94,12 @@ npm run ngrok
 ```
 
 This will create a URL to enter into Slack's _Slash Command_ interface for this app.
+
+### Querying DynamoDB
+The `context.ts` file sets up some fake credentials, and we need these to query the DynamoDB instance using the [aws cli](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/dynamodb/index.html#cli-aws-dynamodb).
+```
+AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS  --endpoint-url http://localhost:4566
+```
 
 ## Slack Configuration
 

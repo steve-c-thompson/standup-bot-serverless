@@ -28,8 +28,7 @@ beforeEach(async () => {
         messageId: "12345",
         timeToLive: jan2Zero
     });
-    const saved = await mapper.put(status);
-    // console.log("Saved preloaded data " + JSON.stringify(saved));
+    await mapper.put(status);
 });
 
 afterAll(async () => {

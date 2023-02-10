@@ -59,13 +59,14 @@ functions:
           - dynamodb:GetItem
           - dynamodb:PutItem
           - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
         Resource:
           Fn::Join:
             - ':'
             - - 'arn:aws:dynamodb'
               - ${self:provider.region}
               - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_PARKING_LOT_DATA'
+              - 'table/*_STANDUP_STATUS'
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function

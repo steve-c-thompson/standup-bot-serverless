@@ -37,7 +37,7 @@ export async function createSecretsFromEnv() {
             SecretString: secretString
         });
         const response = await client.send(command);
-        console.log(response);
+        // console.log(response);
     }
 }
 

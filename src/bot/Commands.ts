@@ -1,3 +1,10 @@
+/**
+ * This class is used to pass data between the App and SlackBot.
+ *
+ * messageId is the ID of the message that was sent or scheduled
+ * postAt is the time the message was sent or scheduled, which is expected to also
+ * be the date of the standup
+ */
 export class ChangeMessageCommand {
     channelId: string
     userId: string

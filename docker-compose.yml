@@ -20,7 +20,7 @@ services:
       - "4574:4574"
       - "${PORT_WEB_UI-8080}:${PORT_WEB_UI-8080}"
     environment:
-      - SERVICES=secretsmanager,cloudformation,sts,s3,lambda,iam,apigateway,dynamodb
+      - SERVICES=secretsmanager,cloudformation,sts,s3,iam,apigateway,dynamodb
       - DEBUG=${DEBUG- }
       - DATA_DIR=${DATA_DIR- }
       - PORT_WEB_UI=${PORT_WEB_UI- }
