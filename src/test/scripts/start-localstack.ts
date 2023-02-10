@@ -3,10 +3,11 @@
 import { sync } from "cross-spawn";
 import * as path from "path";
 
-const ROOT_DIR = path.join(__dirname, "..");
+const ROOT_DIR = path.join(__dirname, "../../..");
 
 /** LocalStack uses bridge mode networking, so the "dockerize" pattern doesn't work */
 export async function startLocalStack() {
+  // Use "--env-file" ".env" to pass the .env contents to docker (though this is not necessary)
   const { status } = sync("docker-compose", ["up", "-d", "localstack"], {
     cwd: ROOT_DIR,
   });

@@ -7,7 +7,11 @@ import {
 import {context} from "../../utils/context";
 import * as dotenv from 'dotenv';
 
+/**
+ * This script will create a secret in localstack's Secrets Manager
+ */
 export async function createSecretsFromEnv() {
+    // dotenv allows using the .env file
     dotenv.config();
     const secretName = context.secretName;
 
@@ -37,7 +41,7 @@ export async function createSecretsFromEnv() {
             SecretString: secretString
         });
         const response = await client.send(command);
-        console.log(response);
+        // console.log(response);
     }
 }
 

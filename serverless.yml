@@ -13,24 +13,24 @@ provider:
   logRetentionInDays: 5
 resources:
   Resources:
-    ParkingLotDynamoDbTable:
+    StatusDynamoDbTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             AttributeType: "S"
-          - AttributeName: "standupDate"
-            AttributeType: "N"
+          - AttributeName: "userId"
+            AttributeType: "S"
         KeySchema:
-          - AttributeName: "channelId"
+          - AttributeName: "id"
             KeyType: "HASH"
-          - AttributeName: "standupDate"
+          - AttributeName: "userId"
             KeyType: "RANGE"
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.stage}_STANDUP_PARKING_LOT_DATA
+        TableName: ${self:provider.stage}_STANDUP_STATUS
         TimeToLiveSpecification:
           AttributeName: timeToLive
           Enabled: true
@@ -59,13 +59,14 @@ functions:
           - dynamodb:GetItem
           - dynamodb:PutItem
           - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
         Resource:
           Fn::Join:
             - ':'
             - - 'arn:aws:dynamodb'
               - ${self:provider.region}
               - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_PARKING_LOT_DATA'
+              - 'table/*_STANDUP_STATUS'
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function

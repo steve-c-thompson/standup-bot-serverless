@@ -15,3 +15,9 @@ export function adjustDateAndTimeForTimezone(dateStr: string | null | undefined,
     }
     return dateTime;
 }
+
+export function createZeroUtcDate(date: Date): Date {
+    const d = new Date(date.getTime());
+    d.setUTCHours(0, 0, 0, 0);
+    return d;
+}
