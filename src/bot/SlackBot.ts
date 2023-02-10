@@ -247,7 +247,7 @@ export class SlackBot {
         const statuses = await this.statusDao.getChannelDataForDate(channelId, date);
 
         let displayItems: ParkingLotDisplayItem[] = [];
-        let proms = statuses.map(async i => {
+        let proms = statuses.filter(s => s.parkingLot || s.parkingLotAttendees && s.parkingLotAttendees.length > 0).map(async i => {
             let item = new ParkingLotDisplayItem();
             let u = await this.queryUser(i.userId, client);
             item.userName = u.name;
