@@ -495,7 +495,7 @@ export class BotViewBuilder {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: "You may edit your status"
+                text: "You may edit your status using the button below. Updates will overwrite the existing message."
             }
         }];
 

@@ -322,6 +322,8 @@ export class SlackBot {
      *
      * `messageId + "#" + channelId + "#" + postAt + "#" + userId`
      *
+     * When attempting to delete, if the message ID is not found, this rethrows an error with user-friendly message.
+     *
      * @param command
      * @param client
      * @param logger
@@ -338,7 +340,7 @@ export class SlackBot {
                     }
                 );
                 if (result.ok) {
-                    const msg = `Status with message ID ${command.messageId} deleted`;
+                    const msg = `Status with Slack message ID ${command.messageId} deleted`;
                     return {
                         channel: command.channelId,
                         text: msg,
@@ -350,7 +352,11 @@ export class SlackBot {
                 }
                 return result.error!.toString();
             } catch (e) {
-                logger.error(e);
+                let errorMsg = (e as Error).message;
+                if(errorMsg.includes("invalid_scheduled_message_id")) {
+                    errorMsg = "No scheduled message found for that status. Perhaps it was already deleted.";
+                    e = new Error(errorMsg);
+                }
                 throw e;
             } finally {
                 // also clean up the parking lot items

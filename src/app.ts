@@ -121,7 +121,7 @@ const init = async () => {
             const msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
                     "`@Standup`."
             const viewArgs = slackBot.buildErrorView(msg);
-            logger.info(viewArgs);
+            // logger.info(viewArgs);
             await ack({
                     response_action: "update",
                     view: viewArgs
@@ -143,6 +143,7 @@ const init = async () => {
                         viewInput.pm.messageDate!,
                         viewInput.pm.userId!);
                  const result = await slackBot.deleteScheduledMessage(command, client, logger);
+                 // Post the result as an ephemeral message.
                  await client.chat.postEphemeral(result as ChatPostEphemeralArguments);
             }
             // If we have a scheduleDateTime, schedule a new message
