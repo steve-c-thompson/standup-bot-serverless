@@ -7,7 +7,7 @@ const ROOT_DIR = path.join(__dirname, "../../..");
 
 /** LocalStack uses bridge mode networking, so the "dockerize" pattern doesn't work */
 export async function startLocalStack() {
-  // User "--env-file" ".env" to set environment variables
+  // Use "--env-file" ".env" to pass the .env contents to docker (though this is not necessary)
   const { status } = sync("docker-compose", ["up", "-d", "localstack"], {
     cwd: ROOT_DIR,
   });
