@@ -17,6 +17,7 @@ import {PrivateMetadata} from "../dto/PrivateMetadata";
 import {logger} from "../utils/context";
 import {StandupStatusDao} from "../data/StandupStatusDao";
 import {StandupStatus, StandupStatusType} from "../data/StandupStatus";
+import moment from "moment-timezone";
 
 export type StandupDialogMessageType = "scheduled" | "post" | "ephemeral" | "edit";
 
@@ -96,7 +97,7 @@ export class SlackBot {
     }
 
     private async loadSavedStatus(command: ChangeMessageCommand, pm: PrivateMetadata) {
-        const status = await this.getSavedStandupData(command.channelId, command.userId, new Date(command.postAt!));
+        const status = await this.getSavedStandupData(command.channelId, command.userId, new Date(command.postAt!), command.timezoneIANA);
         let blockData: StandupViewData | undefined
         if (status) {
             blockData = new StandupViewData({
@@ -113,8 +114,8 @@ export class SlackBot {
         return blockData;
     }
 
-    private async getSavedStandupData(channelId: string, userId: string, date: Date) {
-        return await this.statusDao.getChannelData(channelId, date, userId);
+    private async getSavedStandupData(channelId: string, userId: string, date: Date, timezoneIANA: string) {
+        return await this.statusDao.getChannelData(channelId, date, userId, this.getTimezoneOffsetString(timezoneIANA));
     }
 
     /**
@@ -226,21 +227,31 @@ export class SlackBot {
      * @param viewInput
      * @param saveDate
      * @param messageType
+     * @param timezoneStr Optional IANA timezone string. If not provided, the timezone will be retrieved from the viewInput.
      */
-    public async saveStatusData(viewInput: StandupViewData, saveDate: Date, messageType: StandupStatusType) {
+    public async saveStatusData(viewInput: StandupViewData, saveDate: Date, messageType: StandupStatusType, timezoneStr: string) {
         const status = this.viewInputToStatusData(viewInput, messageType);
         try {
-            const existingData = await this.statusDao.getChannelData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!);
+            let tz = this.getTimezoneOffsetString(timezoneStr);
+            const existingData = await this.statusDao.getChannelData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, tz);
             if (existingData) {
                 logger.info("Found existing data for " + viewInput.pm.channelId! + " " + saveDate + " " + viewInput.pm.userId! + ". Overwriting.")
-                await this.statusDao.updateData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status);
+                await this.statusDao.updateData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status, timezoneStr);
             } else {
-                await this.statusDao.putData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status);
+                await this.statusDao.putData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status, timezoneStr);
             }
 
         } catch (e) {
             logger.error(e);
         }
+    }
+
+    private getTimezoneOffsetString(timezone?: string): string {
+        let timezoneStr = "";
+        if (timezone) {
+            timezoneStr = moment.tz(timezone).format("Z");
+        }
+        return timezoneStr;
     }
 
     public async buildParkingLotDisplayData(channelId: string, date: Date, client: WebClient): Promise<string> {
@@ -360,7 +371,8 @@ export class SlackBot {
                 throw e;
             } finally {
                 // also clean up the parking lot items
-                await this.statusDao.removeStandupStatusData(command.channelId, new Date(command.postAt!), command.userId);
+                const tz = this.getTimezoneOffsetString(command.timezoneIANA!);
+                await this.statusDao.removeStandupStatusData(command.channelId, new Date(command.postAt!), command.userId, tz);
             }
         }
         return "Invalid delete command";
@@ -386,7 +398,13 @@ export class SlackBot {
         return !!channelData.members?.find(m => {
             return m === botUserId;
         });
-
     }
 
+    public getUserTimezone(userId: string, client: WebClient): Promise<string> {
+        return client.users.info({
+            user: userId
+        }).then(resp => {
+            return resp.user?.tz!;
+        });
+    }
 }

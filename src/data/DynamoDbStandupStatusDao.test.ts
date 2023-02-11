@@ -55,6 +55,22 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status?.messageId).toEqual("12345");
             expect(status?.timeToLive).toEqual(jan2Zero);
         });
+        it("existing entity when timezone is specified and utc date is tomorrow", async () => {
+            const status = await dao.getChannelData("ABC", jan2Zero, "Jimmy", "-05:00");
+            expect(status).toBeTruthy();
+            expect(status?.id).toEqual("ABC#" + jan1Zero.getTime());
+            expect(status?.channelId).toEqual("ABC");
+            expect(status?.standupDate).toEqual(jan1Zero);
+            expect(status?.today).toEqual("today");
+            expect(status?.yesterday).toEqual("yesterday");
+            expect(status?.parkingLot).toEqual("parking lot");
+            expect(status?.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(status?.pullRequests).toEqual("pull requests");
+            expect(status?.scheduleDateStr).toEqual("10/20/2020");
+            expect(status?.scheduleTimeStr).toEqual("09:08");
+            expect(status?.messageId).toEqual("12345");
+            expect(status?.timeToLive).toEqual(jan2Zero);
+        });
         it("null for a non-existent entity", async () => {
             const status = await dao.getChannelData("ABC", jan2, "Jimmy");
             expect(status).toBeNull();
@@ -63,6 +79,25 @@ describe(DynamoDbStandupStatusDao.name, () => {
     describe("should retrieve", () => {
         it("existing entities by nonzero date", async () => {
             const statuses = await dao.getChannelDataForDate("ABC", jan1);
+            expect(statuses).toBeTruthy();
+            expect(statuses.length).toEqual(1);
+            const status = statuses[0];
+            expect(status).toBeTruthy();
+            expect(status?.id).toEqual("ABC#" + jan1Zero.getTime());
+            expect(status?.channelId).toEqual("ABC");
+            expect(status?.standupDate).toEqual(jan1Zero);
+            expect(status?.today).toEqual("today");
+            expect(status?.yesterday).toEqual("yesterday");
+            expect(status?.parkingLot).toEqual("parking lot");
+            expect(status?.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(status?.pullRequests).toEqual("pull requests");
+            expect(status?.scheduleDateStr).toEqual("10/20/2020");
+            expect(status?.scheduleTimeStr).toEqual("09:08");
+        });
+        it("existing entities when timezone is specified and utc date is tomorrow", async () => {
+            const standupDate = new Date(jan2Zero.getTime());
+            standupDate.setUTCHours(0, 0, 0, 0);
+            const statuses = await dao.getChannelDataForDate("ABC", standupDate, "-05:00");
             expect(statuses).toBeTruthy();
             expect(statuses.length).toEqual(1);
             const status = statuses[0];
@@ -122,6 +157,78 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.scheduleTimeStr).toEqual("09:08");
             expect(saved.messageId).toEqual("12345");
         });
+        it("an entity with timezone where utc date is different from local date", async () => {
+            const standupDate = new Date("2021-10-20T18:00:00.000-07:00"); // 6PM
+            const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
+            const expectedTtl = new Date(zeroDateToday.getTime());
+            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            const tz = "America/Denver";
+
+            const status: StandupStatus = new StandupStatus({
+                messageType: "posted",
+                today: "today",
+                yesterday: "yesterday",
+                parkingLot: "parking lot",
+                parkingLotAttendees: ["Peter", "Paul", "Mary"],
+                pullRequests: "pull requests",
+                scheduleDateStr: "10/20/2020",
+                scheduleTimeStr: "18:00",
+                messageId: "12345",
+                timeToLive: expectedTtl
+            });
+            const saved = await dao.putData("DDD", standupDate, "Jimmy", status, tz);
+            expect(saved).toBeTruthy();
+            expect(saved.id).toEqual("DDD#" + zeroDateToday.getTime());
+            expect(saved.channelId).toEqual("DDD");
+            expect(saved.standupDate).toEqual(zeroDateToday);
+            expect(saved.timeToLive).toEqual(expectedTtl);
+            expect(saved.userId).toEqual("Jimmy");
+            expect(saved.messageType).toEqual("posted");
+            expect(saved.today).toEqual("today");
+            expect(saved.yesterday).toEqual("yesterday");
+            expect(saved.parkingLot).toEqual("parking lot");
+            expect(saved.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(saved.pullRequests).toEqual("pull requests");
+            expect(saved.scheduleDateStr).toEqual("10/20/2020");
+            expect(saved.scheduleTimeStr).toEqual("18:00");
+            expect(saved.messageId).toEqual("12345");
+        });
+        it("an entity with timezone where utc date midnight (next day) is different from local date", async () => {
+            const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
+            const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
+            const expectedTtl = new Date(zeroDateToday.getTime());
+            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            const tz = "-07:00";
+
+            const status: StandupStatus = new StandupStatus({
+                messageType: "posted",
+                today: "today",
+                yesterday: "yesterday",
+                parkingLot: "parking lot",
+                parkingLotAttendees: ["Peter", "Paul", "Mary"],
+                pullRequests: "pull requests",
+                scheduleDateStr: "10/20/2020",
+                scheduleTimeStr: "17:00",
+                messageId: "12345",
+                timeToLive: expectedTtl
+            });
+            const saved = await dao.putData("DDD", standupDate, "Jimmy", status, tz);
+            expect(saved).toBeTruthy();
+            expect(saved.id).toEqual("DDD#" + zeroDateToday.getTime());
+            expect(saved.channelId).toEqual("DDD");
+            expect(saved.standupDate).toEqual(zeroDateToday);
+            expect(saved.timeToLive).toEqual(expectedTtl);
+            expect(saved.userId).toEqual("Jimmy");
+            expect(saved.messageType).toEqual("posted");
+            expect(saved.today).toEqual("today");
+            expect(saved.yesterday).toEqual("yesterday");
+            expect(saved.parkingLot).toEqual("parking lot");
+            expect(saved.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary"]));
+            expect(saved.pullRequests).toEqual("pull requests");
+            expect(saved.scheduleDateStr).toEqual("10/20/2020");
+            expect(saved.scheduleTimeStr).toEqual("17:00");
+            expect(saved.messageId).toEqual("12345");
+        });
     });
 
     describe("should update", () => {
@@ -154,6 +261,41 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.scheduleTimeStr).toEqual("09:09");
             expect(saved.messageId).toEqual("123456");
         });
+        it("an existing entity with timezone where utc date midnight (next day) is different from local date", async () => {
+            const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
+            const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
+            const expectedTtl = new Date(zeroDateToday.getTime());
+            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            const tz = "-07:00";
+
+            const status: StandupStatus = new StandupStatus({
+                messageType: "scheduled",
+                today: "today2",
+                yesterday: "yesterday2",
+                parkingLot: "parking lot2",
+                parkingLotAttendees: ["Peter", "Paul", "Mary", "John"],
+                scheduleDateStr: "10/20/2021",
+                scheduleTimeStr: "17:00",
+                messageId: "123456",
+                timeToLive: expectedTtl
+            });
+            const saved = await dao.updateData("ABC", standupDate, "Jimmy", status, tz);
+            expect(saved).toBeTruthy();
+            expect(saved.id).toEqual("ABC#" + zeroDateToday.getTime());
+            expect(saved.channelId).toEqual("ABC");
+            expect(saved.standupDate).toEqual(zeroDateToday);
+            expect(saved.timeToLive).toEqual(expectedTtl);
+            expect(saved.userId).toEqual("Jimmy");
+            expect(saved.messageType).toEqual("scheduled");
+            expect(saved.today).toEqual("today2");
+            expect(saved.yesterday).toEqual("yesterday2");
+            expect(saved.parkingLot).toEqual("parking lot2");
+            expect(saved.parkingLotAttendees).toEqual(expect.arrayContaining(["Peter", "Paul", "Mary", "John"]));
+            expect(saved.pullRequests).toBeUndefined();
+            expect(saved.scheduleDateStr).toEqual("10/20/2021");
+            expect(saved.scheduleTimeStr).toEqual("17:00");
+            expect(saved.messageId).toEqual("123456");
+        });
     });
 
     describe("should delete", () => {
@@ -163,6 +305,18 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status!.id).toEqual("ABC#" + jan1Zero.getTime());
 
             const statuses = await dao.getChannelDataForDate("ABC", jan1);
+            expect(statuses).toBeTruthy();
+            expect(statuses.length).toEqual(0);
+        });
+        it("an existing entity with timezone where utc date midnight (next day) is different from local date", async () => {
+            const standupDate = jan2Zero;
+            const zeroDateToday = jan1Zero;
+            const timezone = "-07:00";
+            const status = await dao.removeStandupStatusData("ABC", standupDate, "Jimmy", timezone);
+            expect(status).toBeTruthy();
+            expect(status!.id).toEqual("ABC#" + zeroDateToday.getTime());
+
+            const statuses = await dao.getChannelDataForDate("ABC", standupDate);
             expect(statuses).toBeTruthy();
             expect(statuses.length).toEqual(0);
         });

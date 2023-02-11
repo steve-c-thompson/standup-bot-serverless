@@ -97,6 +97,8 @@ This will create a URL to enter into Slack's _Slash Command_ interface for this 
 
 ### Querying DynamoDB
 The `context.ts` file sets up some fake credentials, and we need these to query the DynamoDB instance using the [aws cli](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/dynamodb/index.html#cli-aws-dynamodb).
+
+This command will scan the local DynamoDB instance for all items the table `local_STANDUP_STATUS`.
 ```
 AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS  --endpoint-url http://localhost:4566
 ```
@@ -118,8 +120,10 @@ The app needs permissions to interact with the Slack workspace. Enable OAuth sco
 * `chat:write`
 * `chat:write.customize`
 * `commands`
+* `groups:read`
 * `users.profile:read`
 * `users:read`
+* `channels:read`
 
 ## 
 ## Author

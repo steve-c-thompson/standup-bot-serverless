@@ -141,7 +141,8 @@ const init = async () => {
                  let command = new ChangeMessageCommand(viewInput.pm.messageId!,
                         viewInput.pm.channelId!,
                         viewInput.pm.messageDate!,
-                        viewInput.pm.userId!);
+                        viewInput.pm.userId!,
+                        viewInput.timezone!);
                  const result = await slackBot.deleteScheduledMessage(command, client, logger);
                  // Post the result as an ephemeral message.
                  await client.chat.postEphemeral(result as ChatPostEphemeralArguments);
@@ -159,7 +160,9 @@ const init = async () => {
                 try {
                     const saveDate = new Date(viewInput.scheduleDateTime);
                     viewInput.pm.messageId = scheduleResponse.scheduled_message_id!;
-                    await slackBot.saveStatusData(viewInput, saveDate, "scheduled");
+                    // timezone is assumed present with scheduleDateTime
+                    const tz = viewInput.timezone!;
+                    await slackBot.saveStatusData(viewInput, saveDate, "scheduled", tz);
                 } catch (e) {
                     logger.error(e);
                 }
@@ -173,7 +176,8 @@ const init = async () => {
                 let command = new ChangeMessageCommand(msgId,
                     viewInput.pm.channelId!,
                     viewInput.scheduleDateTime,
-                    viewInput.pm.userId!)
+                    viewInput.pm.userId!,
+                    viewInput.timezone!);
                 command.messageId = msgId;
                 let confMessage = slackBot.buildScheduledMessageDialog(command,
                     viewInput.timezone!,
@@ -190,7 +194,9 @@ const init = async () => {
                     const result = await client.chat.update(chatMessageArgs);
                     try {
                         const saveDate = new Date(viewInput.pm.messageDate!);
-                        await slackBot.saveStatusData(viewInput, saveDate, "scheduled");
+                        // set the timezone for saving
+                        const tz = await slackBot.getUserTimezone(viewInput.pm.userId!, client);
+                        await slackBot.saveStatusData(viewInput, saveDate, "scheduled", tz);
                     } catch (e) {
                         logger.error(e);
                     }
@@ -212,12 +218,13 @@ const init = async () => {
                     const result = await client.chat.postMessage(chatMessageArgs);
                     const standupDate = new Date();
                     viewInput.pm.messageId = result.ts!;
+                    const tz = await slackBot.getUserTimezone(viewInput.pm.userId!, client);
                     try {
-                        await slackBot.saveStatusData(viewInput, standupDate, "posted");
+                        await slackBot.saveStatusData(viewInput, standupDate, "posted", tz);
                     } catch (e) {
                         logger.error(e);
                     }
-                    const cmd = new ChangeMessageCommand(result.message?.ts!, result.channel!, standupDate.getTime(), viewInput.pm.userId!);
+                    const cmd = new ChangeMessageCommand(result.message?.ts!, result.channel!, standupDate.getTime(), viewInput.pm.userId!, tz);
                     const edit = slackBot.buildChatMessageEditDialog(cmd);
                     await client.chat.postEphemeral(edit);
                 }
