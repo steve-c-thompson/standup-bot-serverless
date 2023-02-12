@@ -248,7 +248,6 @@ const init = async () => {
         try {
             await ack();
             const action = (body as BlockAction)["actions"][0];
-            // logger.info(JSON.stringify(body, null, 2));
             let result;
             let cmd, triggerId;
             const msgVal = (action as ButtonAction).value;
