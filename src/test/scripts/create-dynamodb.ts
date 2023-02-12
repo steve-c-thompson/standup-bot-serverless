@@ -3,7 +3,6 @@
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {context, logger, standupStatusTableName} from "../../utils/context";
 import {StandupStatus} from "../../data/StandupStatus";
-import {UpdateTableInput} from "aws-sdk/clients/dynamodb";
 
 export const jan1 = new Date(2020, 0, 1);
 export const jan2 = new Date(2020, 0, 2);

@@ -103,7 +103,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status).toBeNull();
         });
         it("existing entity by message id", async () => {
-            const status = await dao.getChannelDataByMessageId("99999");
+            const status = await dao.getStandupStatusByMessageId("99999");
             expect(status).toBeTruthy();
             expect(status?.id).toEqual("ABC#" + jan2Zero.getTime());
             expect(status?.userId).toEqual("Dave");
@@ -356,7 +356,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
 
     describe("should delete", () => {
         it("an existing entity", async () => {
-            const status = await dao.removeStandupStatusData("ABC", jan1TwelvePmTz, "Jimmy", tzOffset);
+            const status = await dao.removeStandupStatus("ABC", jan1TwelvePmTz, "Jimmy", tzOffset);
             expect(status).toBeTruthy();
             expect(status!.id).toEqual("ABC#" + jan1Zero.getTime());
 
@@ -367,7 +367,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
         it("an existing entity with timezone where utc date midnight (next day) is different from local date", async () => {
             const zeroDateToday = jan1Zero;
             const timezone = tzOffset;
-            const status = await dao.removeStandupStatusData("ABC", jan1ElevenPmTz, "Jimmy", timezone);
+            const status = await dao.removeStandupStatus("ABC", jan1ElevenPmTz, "Jimmy", timezone);
             expect(status).toBeTruthy();
             expect(status!.id).toEqual("ABC#" + zeroDateToday.getTime());
 
@@ -376,11 +376,11 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(statuses.length).toEqual(0);
         });
         it("return undefined if no entity for that channel, date, and user", async () => {
-            const status = await dao.removeStandupStatusData("ABC", jan2, "Jimmy", tzOffset);
+            const status = await dao.removeStandupStatus("ABC", jan2, "Jimmy", tzOffset);
             expect(status).toBeUndefined();
         });
         it("an existing entity by messageId", async () => {
-            const status = await dao.removeStandupStatusDataByMessageId("12345");
+            const status = await dao.removeStandupStatusByMessageId("12345");
             expect(status).toBeTruthy();
             expect(status!.id).toEqual("ABC#" + jan1Zero.getTime());
 
@@ -389,7 +389,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(statuses.length).toEqual(0);
         });
         it("return undefined if no entity for that messageId", async () => {
-            const status = await dao.removeStandupStatusDataByMessageId("88888");
+            const status = await dao.removeStandupStatusByMessageId("88888");
             expect(status).toBeUndefined();
         });
     });

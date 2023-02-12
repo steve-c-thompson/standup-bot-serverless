@@ -2,34 +2,8 @@ import {StandupStatus} from "./StandupStatus";
 import {StandupStatusDao} from "./StandupStatusDao";
 import {createZeroUtcDate} from "../utils/datefunctions";
 import {DynamoDB} from "aws-sdk";
-import {DataMapper, DynamoDbSchema, DynamoDbTable, QueryIterator} from "@aws/dynamodb-data-mapper";
+import {DataMapper, QueryIterator} from "@aws/dynamodb-data-mapper";
 import {context, logger} from "../utils/context";
-
-export class StatusMessageIdProjection {
-    messageId: string;
-    id: string;
-}
-
-// Object.defineProperties(StatusMessageIdProjection.prototype, {
-//     [DynamoDbSchema]: {
-//         value: {
-//             messageId: {type: 'String', keyType: 'HASH'},
-//             id: {type: 'string'},
-//             botId: {
-//                 type: 'String',
-//                 indexKeyConfigurations: {
-//                     'tenantId-botId-Index': 'RANGE'
-//                 }
-//             },
-//             tenantId: {
-//                 type: 'String',
-//                 indexKeyConfigurations: {
-//                     'tenantId-botId-Index': 'HASH'
-//                 }
-//             },
-//         }
-//     }
-// })
 
 export class DynamoDbStandupStatusDao implements StandupStatusDao {
     private readonly client: DynamoDB;
@@ -63,7 +37,7 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         }
     }
 
-    async getChannelDataByMessageId(messageId: string): Promise<StandupStatus | null> {
+    async getStandupStatusByMessageId(messageId: string): Promise<StandupStatus | null> {
         const query = {
             indexName: "messageId-index",
             keyCondition: {
@@ -161,7 +135,7 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
      * @param userId
      * @param timezoneOffset
      */
-    async removeStandupStatusData(channelId: string, date: Date, userId: string, timezoneOffset: number): Promise<StandupStatus | undefined> {
+    async removeStandupStatus(channelId: string, date: Date, userId: string, timezoneOffset: number): Promise<StandupStatus | undefined> {
         const d = new StandupStatus();
         date = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffset);
         d.id = this.buildId(channelId, date);
@@ -169,8 +143,8 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         return this.mapper.delete(d);
     }
 
-    async removeStandupStatusDataByMessageId(messageId: string): Promise<StandupStatus | undefined> {
-        const obj = await this.getChannelDataByMessageId(messageId);
+    async removeStandupStatusByMessageId(messageId: string): Promise<StandupStatus | undefined> {
+        const obj = await this.getStandupStatusByMessageId(messageId);
         if(obj) {
             return await this.mapper.delete(obj as unknown as StandupStatus);
         }
