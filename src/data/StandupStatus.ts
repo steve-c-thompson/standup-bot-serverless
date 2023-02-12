@@ -12,6 +12,7 @@ export class StandupStatus {
 
     @hashKey()
     id: string; // A concatenation of channelId#standupDate.getTime(), expected to be epoch midnight for standup
+                // If a standup occurs on Jan1, 2020 in any timezone, the ID will use Jan1, 2020 00:00:00 UTC
 
     @rangeKey()
     userId: string;
@@ -23,6 +24,9 @@ export class StandupStatus {
             return d;
         }
     }) standupDate: Date; // epoch midnight for standup, used in ID
+
+    @attribute()
+    userTimezoneOffset: number; // The timezone offset of the user in minutes
 
     @attribute()
     channelId: string;
@@ -60,7 +64,14 @@ export class StandupStatus {
     }) timeToLive?: Date;
 
     // The message ID if this message was sent or scheduled
-    @attribute()
+    // This must be configured in serverless.yml
+    @attribute({
+        type: "String",
+        indexKeyConfigurations: {
+            "messageId-index": "HASH",
+        },
+        attributeName: "messageId"
+    })
     messageId?: string;
 
     @attribute()

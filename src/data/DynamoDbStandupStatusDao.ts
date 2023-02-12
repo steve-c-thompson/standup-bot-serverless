@@ -2,9 +2,34 @@ import {StandupStatus} from "./StandupStatus";
 import {StandupStatusDao} from "./StandupStatusDao";
 import {createZeroUtcDate} from "../utils/datefunctions";
 import {DynamoDB} from "aws-sdk";
-import {DataMapper, QueryIterator} from "@aws/dynamodb-data-mapper";
+import {DataMapper, DynamoDbSchema, DynamoDbTable, QueryIterator} from "@aws/dynamodb-data-mapper";
 import {context, logger} from "../utils/context";
-import moment from "moment";
+
+export class StatusMessageIdProjection {
+    messageId: string;
+    id: string;
+}
+
+// Object.defineProperties(StatusMessageIdProjection.prototype, {
+//     [DynamoDbSchema]: {
+//         value: {
+//             messageId: {type: 'String', keyType: 'HASH'},
+//             id: {type: 'string'},
+//             botId: {
+//                 type: 'String',
+//                 indexKeyConfigurations: {
+//                     'tenantId-botId-Index': 'RANGE'
+//                 }
+//             },
+//             tenantId: {
+//                 type: 'String',
+//                 indexKeyConfigurations: {
+//                     'tenantId-botId-Index': 'HASH'
+//                 }
+//             },
+//         }
+//     }
+// })
 
 export class DynamoDbStandupStatusDao implements StandupStatusDao {
     private readonly client: DynamoDB;
@@ -20,17 +45,16 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
     /**
      * Get channel data for this channel and date, for this specific user. Return null if not found.
      * @param channelId
-     * @param date
+     * @param date a date in local timezone. The timezone offset will be used to calculate the date in UTC
      * @param userId
-     * @param timezoneOffsetString - optional timezone string with format +/-HH:MM
+     * @param timezoneOffset
      */
-    async getChannelData(channelId: string, date: Date, userId: string, timezoneOffsetString?: string): Promise<StandupStatus | null> {
-        let calDate = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffsetString);
+    async getChannelData(channelId: string, date: Date, userId: string, timezoneOffset: number): Promise<StandupStatus | null> {
+        let calDate = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffset);
         const id = this.buildId(channelId, calDate);
         const toFetch = new StandupStatus({
             id: id,
-            userId: userId,
-            standupDate: date
+            userId: userId
         });
         try {
             return await Promise.resolve(this.mapper.get(toFetch));
@@ -39,14 +63,49 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         }
     }
 
+    async getChannelDataByMessageId(messageId: string): Promise<StandupStatus | null> {
+        const query = {
+            indexName: "messageId-index",
+            keyCondition: {
+                messageId: messageId
+            },
+            scanIndexForward: true,
+            limit: 1,
+            valueConstructor: StandupStatus,
+        };
+        const it: QueryIterator<StandupStatus> = await this.mapper.query(query);
+        const arr = [];
+        for await (const s of it) {
+            arr.push(s);
+        }
+
+        if (arr.length > 0) {
+            return arr[0];
+            // // now get the whole objecct
+            // const id = arr[0].id;
+            // const it: QueryIterator<StandupStatus> = await this.mapper.query(StandupStatus, {
+            //     id: id
+            // });
+            // const arr2 = [];
+            // for await (const s of it) {
+            //     arr2.push(s);
+            // }
+            // if(arr2.length > 0) {
+            //     return arr2[0];
+            // }
+        }
+
+        return null;
+    }
+
     /**
      * Get all data for this channel and date, return empty array if none found.
      * @param channelId
      * @param date
-     * @param timezoneOffsetString - optional timezone string with format +/-HH:MM
+     * @param timezoneOffset
      */
-    async getChannelDataForDate(channelId: string, date: Date, timezoneOffsetString?: string): Promise<StandupStatus[]> {
-        date = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffsetString);
+    async getChannelDataForDate(channelId: string, date: Date, timezoneOffset: number): Promise<StandupStatus[]> {
+        date = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffset);
         const id = this.buildId(channelId, date);
         const it: QueryIterator<StandupStatus> = await this.mapper.query(StandupStatus, {
             id: id
@@ -65,13 +124,13 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
      * @param standupDate
      * @param userId
      * @param data
-     * @param timezoneOffsetString - optional timezone string with format +/-HH:MM
+     * @param timezoneOffset
      */
-    async putData(channelId: string, standupDate: Date, userId: string, data: StandupStatus, timezoneOffsetString?: string): Promise<StandupStatus> {
+    async putData(channelId: string, standupDate: Date, userId: string, data: StandupStatus, timezoneOffset: number): Promise<StandupStatus> {
         data.channelId = channelId;
         data.standupDate = standupDate;
         data.userId = userId;
-        this.validateAndSetDates(data, timezoneOffsetString);
+        this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);
         return this.mapper.put(data);
     }
@@ -82,15 +141,15 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
      * @param standupDate
      * @param userId
      * @param data
-     * @param timezoneOffsetString - optional timezone string with format +/-HH:MM
+     * @param timezoneOffset
      */
-    async updateData(channelId: string, standupDate: Date, userId: string,data: StandupStatus, timezoneOffsetString?: string): Promise<StandupStatus> {
+    async updateData(channelId: string, standupDate: Date, userId: string,data: StandupStatus, timezoneOffset: number): Promise<StandupStatus> {
         data.channelId = channelId;
         data.standupDate = standupDate;
         data.userId = userId;
         data.updatedAt = new Date();
         // ensure we keep the dates aligned
-        this.validateAndSetDates(data, timezoneOffsetString);
+        this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);
         return this.mapper.update(data, {onMissing: "skip"});
     }
@@ -100,14 +159,22 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
      * @param channelId
      * @param date
      * @param userId
-     * @param timezoneOffsetString - optional timezone string with format +/-HH:MM
+     * @param timezoneOffset
      */
-    async removeStandupStatusData(channelId: string, date: Date, userId: string, timezoneOffsetString?: string): Promise<StandupStatus | undefined> {
+    async removeStandupStatusData(channelId: string, date: Date, userId: string, timezoneOffset: number): Promise<StandupStatus | undefined> {
         const d = new StandupStatus();
-        date = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffsetString);
+        date = this.calibrateStandupDateFromTimezoneOffset(date, timezoneOffset);
         d.id = this.buildId(channelId, date);
         d.userId = userId;
         return this.mapper.delete(d);
+    }
+
+    async removeStandupStatusDataByMessageId(messageId: string): Promise<StandupStatus | undefined> {
+        const obj = await this.getChannelDataByMessageId(messageId);
+        if(obj) {
+            return await this.mapper.delete(obj as unknown as StandupStatus);
+        }
+        return undefined;
     }
 
     private buildId(channelId: string, date: Date) {
@@ -115,12 +182,12 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         return channelId + "#" + d.getTime();
     }
 
-    private validateAndSetDates(data: StandupStatus, timezoneOffsetString?: string) {
+    private validateAndSetDates(data: StandupStatus, timezoneOffset: number) {
         if (!data.standupDate) {
             data.standupDate = new Date();
         }
-        logger.debug("standupDate before calibrate: " + data.standupDate + " timezoneOffsetString: " + timezoneOffsetString);
-        data.standupDate = this.calibrateStandupDateFromTimezoneOffset(data.standupDate, timezoneOffsetString);
+        logger.debug("standupDate before calibrate: " + data.standupDate + " timezoneOffset: " + timezoneOffset);
+        data.standupDate = this.calibrateStandupDateFromTimezoneOffset(data.standupDate, timezoneOffset);
         logger.debug("standupDate after calibrate: " + data.standupDate);
         // Now zero out the time, so that we can use it as a partition key
         data.standupDate = createZeroUtcDate(data.standupDate);
@@ -129,21 +196,16 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         data.timeToLive.setDate(data.standupDate!.getDate() + 1);
     }
 
-    private calibrateStandupDateFromTimezoneOffset(date: Date, timezoneOffsetString?: string): Date {
-        let dt = date;
-        // Does this date have a timezone offset that we need to account for?
-        if(timezoneOffsetString) {
-            // If so, we need to make sure that the standup date is set to the correct date, based on the timezone.
-            // For example, if the user says "standup for today" in the US (UTC-5), we need to make sure that the standup date
-            // is set to the previous day.
-            // We can't just use the timezone to set the standup date, because the user might be in a timezone where it's
-            // the next day, but they want to do the standup for the previous day.
-            // So, we need to make sure that the standup date is set to the correct date, based on the timezone.
-            dt = new Date(date.getTime());
-            const timezoneOffsetMinutes = moment().utcOffset(timezoneOffsetString).utcOffset();
-            dt.setMinutes(date.getMinutes() + timezoneOffsetMinutes);
-        }
-        return dt;
+    /**
+     * Calibrate the standup date from the timezone offset. This is because the date might be the next day in UTC, but we want to use the local date.
+     * @param date a moment in epoch time
+     * @param timezoneOffset the timezone offset in minutes
+     * @private
+     */
+    private calibrateStandupDateFromTimezoneOffset(date: Date, timezoneOffset: number): Date {
+        const calDate = new Date(date.getTime());
+        calDate.setMinutes(calDate.getMinutes() + timezoneOffset);
+        return calDate;
     }
 
     private setIdfromChannelIdAndDate(data: StandupStatus) {

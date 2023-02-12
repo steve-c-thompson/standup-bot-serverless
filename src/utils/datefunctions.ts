@@ -21,3 +21,7 @@ export function createZeroUtcDate(date: Date): Date {
     d.setUTCHours(0, 0, 0, 0);
     return d;
 }
+
+export function getTimezoneOffset(timezone: string): number {
+    return moment.tz(timezone).utcOffset();
+}

@@ -3,6 +3,7 @@
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {context, logger, standupStatusTableName} from "../../utils/context";
 import {StandupStatus} from "../../data/StandupStatus";
+import {UpdateTableInput} from "aws-sdk/clients/dynamodb";
 
 export const jan1 = new Date(2020, 0, 1);
 export const jan2 = new Date(2020, 0, 2);
@@ -15,8 +16,17 @@ export async function createStandupStatus() {
         await mapper.ensureTableNotExists(StandupStatus);
         await mapper.ensureTableExists(StandupStatus, {
             readCapacityUnits: 5,
-            writeCapacityUnits: 5
+            writeCapacityUnits: 5,
+            indexOptions: {
+                "messageId-index": {
+                    type: 'global',
+                    readCapacityUnits: 1,
+                    writeCapacityUnits: 1,
+                    projection: "all",
+                }
+            }
         });
+
         logger.info(`Dynamo table ${context.tableNamePrefix + standupStatusTableName} created`);
     } catch (e) {
         console.error("Error creating Dynamo table", e);
