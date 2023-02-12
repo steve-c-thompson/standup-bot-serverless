@@ -22,11 +22,23 @@ resources:
             AttributeType: "S"
           - AttributeName: "userId"
             AttributeType: "S"
+          - AttributeName: "messageId"
+            AttributeType: "S"
         KeySchema:
           - AttributeName: "id"
             KeyType: "HASH"
           - AttributeName: "userId"
             KeyType: "RANGE"
+        GlobalSecondaryIndexes:
+          - IndexName: "messageId-index"
+            KeySchema:
+              - AttributeName: "messageId"
+                KeyType: "HASH"
+            Projection:
+              ProjectionType: "ALL"
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
@@ -67,6 +79,16 @@ functions:
               - ${self:provider.region}
               - Ref: 'AWS::AccountId'
               - 'table/*_STANDUP_STATUS'
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource:
+          Fn::Join:
+            - ':'
+            - - 'arn:aws:dynamodb'
+              - ${self:provider.region}
+              - Ref: 'AWS::AccountId'
+              - 'table/*_STANDUP_STATUS/index/*'
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function

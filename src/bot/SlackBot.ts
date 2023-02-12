@@ -8,7 +8,7 @@ import {
 } from "@slack/web-api";
 import {BotViewBuilder, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {adjustDateAndTimeForTimezone, formatDateToPrintable} from "../utils/datefunctions";
+import {adjustDateAndTimeForTimezone, formatDateToPrintable, getTimezoneOffset} from "../utils/datefunctions";
 import {ChangeMessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
@@ -52,51 +52,41 @@ export class SlackBot {
     /**
      * Create a modal view to edit the message. Retrieve data for the message, format, and delegate to builder.
      *
-     * Button payload must be
-     *
-     * `message + "#" + channelId + "#" + postAt + "#" + userId`
-     *
      * @param command
+     * @param channelId
+     * @param userId
      * @param triggerId
      * @param client
      */
-    public async buildModalViewForPostUpdate(command: ChangeMessageCommand, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
+    public async buildModalViewForPostUpdate(command: ChangeMessageCommand, channelId: string, userId: string,triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
+        return this.loadModalViewForUpdate(channelId, userId, command.messageId!, command.postAt, triggerId, "edit", client);
+    }
+
+    public async buildModalViewForScheduleUpdate(command: ChangeMessageCommand, channelId: string, userId: string,triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
+        return this.loadModalViewForUpdate(channelId, userId, command.messageId!, command.postAt, triggerId, "scheduled", client);
+    }
+
+    private async loadModalViewForUpdate(channelId: string, userId: string, messageId: string, postAt: number, triggerId: string,  messageType: StandupDialogMessageType, client: WebClient): Promise<ViewsOpenArguments> {
         const pm: PrivateMetadata = {
-            channelId: command.channelId,
-            userId: command.userId,
-            messageId: command?.messageId,
-            messageDate: command?.postAt,
-            messageType: "edit"
+            channelId: channelId,
+            userId: userId,
+            messageId: messageId,
+            messageType: messageType,
+            messageDate: postAt
         };
 
-        const userInfo = await this.queryUser(pm.userId!, client);
         const trigger_id = triggerId;
 
-        let blockData = await this.loadSavedStatus(command, pm);
+        const status = await this.getSavedStandupForMessageId(messageId);
+
+        const userInfo = await this.queryUser(userId, client);
+
+        let blockData = await this.loadSavedStatus(status, pm);
 
         return this.viewBuilder.buildModalInputView(trigger_id, pm, userInfo, blockData);
     }
 
-    public async buildModalViewForScheduleUpdate(command: ChangeMessageCommand, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
-        // Store the message ID for updating later
-        const pm: PrivateMetadata = {
-            channelId: command.channelId,
-            userId: command.userId,
-            messageId: command?.messageId,
-            messageDate: command?.postAt,
-            messageType: "scheduled"
-        };
-
-        const userInfo = await this.queryUser(pm.userId!, client);
-        const trigger_id = triggerId;
-
-        let blockData = await this.loadSavedStatus(command, pm);
-
-        return this.viewBuilder.buildModalInputView(trigger_id, pm, userInfo, blockData);
-    }
-
-    private async loadSavedStatus(command: ChangeMessageCommand, pm: PrivateMetadata) {
-        const status = await this.getSavedStandupData(command.channelId, command.userId, new Date(command.postAt!));
+    private async loadSavedStatus(status: StandupStatus | null, pm: PrivateMetadata) {
         let blockData: StandupViewData | undefined
         if (status) {
             blockData = new StandupViewData({
@@ -113,8 +103,15 @@ export class SlackBot {
         return blockData;
     }
 
-    private async getSavedStandupData(channelId: string, userId: string, date: Date) {
-        return await this.statusDao.getChannelData(channelId, date, userId);
+    private ensureTimezoneOffset(timezone: string | number): number {
+        if (typeof timezone === 'string') {
+            return getTimezoneOffset(timezone);
+        }
+        return timezone;
+    }
+
+    private async getSavedStandupForMessageId(messageId: string) : Promise<StandupStatus | null> {
+        return await this.statusDao.getStandupStatusByMessageId(messageId);
     }
 
     /**
@@ -172,7 +169,7 @@ export class SlackBot {
 
     /**
      * Create the main message to display to the user after submitting modal.
-     * @param viewInput
+     * @param viewInput The data from the modal view
      * @param client
      */
     public async createChatMessage(viewInput: StandupViewData, client: WebClient):
@@ -226,16 +223,18 @@ export class SlackBot {
      * @param viewInput
      * @param saveDate
      * @param messageType
+     * @param timezone
      */
-    public async saveStatusData(viewInput: StandupViewData, saveDate: Date, messageType: StandupStatusType) {
+    public async saveStatusData(viewInput: StandupViewData, saveDate: Date, messageType: StandupStatusType, timezone: number | string) {
+        const tz = this.ensureTimezoneOffset(timezone);
         const status = this.viewInputToStatusData(viewInput, messageType);
         try {
-            const existingData = await this.statusDao.getChannelData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!);
+            const existingData = await this.statusDao.getChannelData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, tz);
             if (existingData) {
-                logger.info("Found existing data for " + viewInput.pm.channelId! + " " + saveDate + " " + viewInput.pm.userId! + ". Overwriting.")
-                await this.statusDao.updateData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status);
+                logger.info("Found existing data for " + viewInput.pm.channelId! + " " + saveDate + " userId " + viewInput.pm.userId! + ". Overwriting.")
+                await this.statusDao.updateData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status, tz);
             } else {
-                await this.statusDao.putData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status);
+                await this.statusDao.putData(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, status, tz);
             }
 
         } catch (e) {
@@ -243,10 +242,17 @@ export class SlackBot {
         }
     }
 
-    public async buildParkingLotDisplayData(channelId: string, date: Date, client: WebClient): Promise<string> {
-        const statuses = await this.statusDao.getChannelDataForDate(channelId, date);
+    /**
+     * Build the data to display parking lot contents.
+     * @param channelId
+     * @param date
+     * @param timezoneOffset
+     * @param client
+     */
+    public async buildParkingLotDisplayData(channelId: string, date: Date, timezoneOffset: number, client: WebClient): Promise<string> {
+        const statuses = await this.statusDao.getChannelDataForDate(channelId, date, timezoneOffset);
 
-        let displayItems: ParkingLotDisplayItem[] = [];
+        let displayItems: ParkingLotDisplayItem[];
         let proms = statuses.filter(s => s.parkingLot || s.parkingLotAttendees && s.parkingLotAttendees.length > 0).map(async i => {
             let item = new ParkingLotDisplayItem();
             let u = await this.queryUser(i.userId, client);
@@ -281,9 +287,13 @@ export class SlackBot {
         }
     }
 
-    public buildChatMessageEditDialog(cmd: ChangeMessageCommand) {
-        const channelId = cmd.channelId;
-        const userId = cmd.userId;
+    /**
+     * Build the edit message blocks, for sending via the chat API.
+     * @param cmd
+     * @param channelId
+     * @param userId
+     */
+    public buildChatMessageEditDialog(cmd: ChangeMessageCommand, channelId: string, userId: string) {
         const msg = "Edit Status";
         const blocks = this.viewBuilder.buildChatMessageEditBlocks(cmd, msg);
         return {
@@ -294,19 +304,34 @@ export class SlackBot {
         }
     }
 
-    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
+    /**
+     * Build the scheduled message dialog and blocks, for sending via the chat API.
+     * @param cmd
+     * @param channelId
+     * @param userId
+     * @param timezone
+     * @param args
+     */
+    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, channelId: string, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
         const dateStr = formatDateToPrintable(cmd.postAt, timezone);
         const msg = "Your status below is scheduled to send on\n " + dateStr;
 
         const blocks = this.viewBuilder.buildScheduledMessageDialog(cmd, timezone, args, msg);
+
         return {
-            channel: cmd.channelId,
-            user: cmd.userId,
+            channel: channelId,
+            user: userId,
             text: msg,
             blocks: blocks
         }
     }
 
+    /**
+     * Build an ephemeral message for the user, for sending via the chat API.
+     * @param channelId
+     * @param userId
+     * @param message
+     */
     public buildEphemeralContextMessage(channelId: string, userId: string, message: string): ChatPostEphemeralArguments {
         const msg = this.viewBuilder.buildSimpleContextBlock(message);
         return {
@@ -318,39 +343,38 @@ export class SlackBot {
     }
 
     /**
-     * Delete the message based on its ID. Button payload must be
-     *
-     * `messageId + "#" + channelId + "#" + postAt + "#" + userId`
-     *
-     * When attempting to delete, if the message ID is not found, this rethrows an error with user-friendly message.
+     * Delete the message based on its ID, which is sent in the command.
      *
      * @param command
      * @param client
      * @param logger
      */
     public async deleteScheduledMessage(command: ChangeMessageCommand, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments | string> {
-        logger.info(`Deleting message ${command?.messageId} for channel ${command?.channelId} on date ${command?.postAt} for user ${command?.userId}`);
 
         if (command) {
             try {
-                const result = await client.chat.deleteScheduledMessage(
-                    {
-                        channel: command.channelId,
-                        scheduled_message_id: command.messageId,
+                const status = await this.statusDao.getStandupStatusByMessageId(command.messageId);
+                logger.info(`Deleting message ${command?.messageId} for user ${status?.userId} in channel ${status?.channelId}`);
+                if (status) {
+                    const result = await client.chat.deleteScheduledMessage(
+                        {
+                            channel: status.channelId,
+                            scheduled_message_id: command.messageId,
+                        }
+                    );
+                    if (result.ok) {
+                        const msg = `Status with Slack message ID ${command.messageId} deleted`;
+                        return {
+                            channel: status.channelId,
+                            text: msg,
+                            mrkdwn: true,
+                            unfurl_links: false,
+                            unfurl_media: false,
+                            user: status.userId
+                        };
                     }
-                );
-                if (result.ok) {
-                    const msg = `Status with Slack message ID ${command.messageId} deleted`;
-                    return {
-                        channel: command.channelId,
-                        text: msg,
-                        mrkdwn: true,
-                        unfurl_links: false,
-                        unfurl_media: false,
-                        user: command.userId
-                    };
+                    return result.error!.toString();
                 }
-                return result.error!.toString();
             } catch (e) {
                 let errorMsg = (e as Error).message;
                 if(errorMsg.includes("invalid_scheduled_message_id")) {
@@ -360,20 +384,37 @@ export class SlackBot {
                 throw e;
             } finally {
                 // also clean up the parking lot items
-                await this.statusDao.removeStandupStatusData(command.channelId, new Date(command.postAt!), command.userId);
+                logger.info(`Removing StandupStatus with message ID ${command.messageId}`);
+                await this.statusDao.removeStandupStatusByMessageId(command.messageId);
             }
         }
         return "Invalid delete command";
     }
 
+    /**
+     * Delegate to viewBuilder to build a simple error message modal view.
+     * @param msg
+     */
     public buildErrorView(msg: string): ModalView {
         return this.viewBuilder.buildErrorView(msg);
     }
 
+    /**
+     * Delegate to viewBuilder to build a simple error message for ephemeral messages.
+     * @param channelId
+     * @param userId
+     * @param msg
+     */
     public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments {
         return this.viewBuilder.buildErrorMessage(channelId, userId, msg);
     }
 
+    /**
+     * Validate that the bot is a member of the channel. Returns true if it is, false otherwise.
+     * @param channelId
+     * @param botId
+     * @param client
+     */
     async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
         const channelData = await client.conversations.members({
             channel: channelId,
@@ -386,7 +427,26 @@ export class SlackBot {
         return !!channelData.members?.find(m => {
             return m === botUserId;
         });
-
     }
 
+    public getUserTimezone(userId: string, client: WebClient): Promise<string> {
+        return client.users.info({
+            user: userId
+        }).then(resp => {
+            return resp.user?.tz!;
+        });
+    }
+
+    /**
+     * Get the user's timezone offset in minutes.
+     * @param userId
+     * @param client
+     */
+    public getUserTimezoneOffset(userId: string, client: WebClient): Promise<number> {
+        return client.users.info({
+            user: userId
+        }).then(resp => {
+            return resp.user?.tz_offset! / 60; // convert to minutes
+        });
+    }
 }

@@ -15,8 +15,17 @@ export async function createStandupStatus() {
         await mapper.ensureTableNotExists(StandupStatus);
         await mapper.ensureTableExists(StandupStatus, {
             readCapacityUnits: 5,
-            writeCapacityUnits: 5
+            writeCapacityUnits: 5,
+            indexOptions: {
+                "messageId-index": {
+                    type: 'global',
+                    readCapacityUnits: 1,
+                    writeCapacityUnits: 1,
+                    projection: "all",
+                }
+            }
         });
+
         logger.info(`Dynamo table ${context.tableNamePrefix + standupStatusTableName} created`);
     } catch (e) {
         console.error("Error creating Dynamo table", e);
