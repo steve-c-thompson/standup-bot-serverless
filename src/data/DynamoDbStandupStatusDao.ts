@@ -55,18 +55,6 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
 
         if (arr.length > 0) {
             return arr[0];
-            // // now get the whole objecct
-            // const id = arr[0].id;
-            // const it: QueryIterator<StandupStatus> = await this.mapper.query(StandupStatus, {
-            //     id: id
-            // });
-            // const arr2 = [];
-            // for await (const s of it) {
-            //     arr2.push(s);
-            // }
-            // if(arr2.length > 0) {
-            //     return arr2[0];
-            // }
         }
 
         return null;

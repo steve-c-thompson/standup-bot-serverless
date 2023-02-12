@@ -50,7 +50,7 @@ beforeEach(async () => {
         messageId: "99999",
         timeToLive: jan2Zero
     });
-    const stat = await mapper.put(status);
+    await mapper.put(status);
     await mapper.put(status2);
     // console.log(JSON.stringify(stat, null, 2));
 });

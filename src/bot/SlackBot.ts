@@ -242,10 +242,17 @@ export class SlackBot {
         }
     }
 
+    /**
+     * Build the data to display parking lot contents.
+     * @param channelId
+     * @param date
+     * @param timezoneOffset
+     * @param client
+     */
     public async buildParkingLotDisplayData(channelId: string, date: Date, timezoneOffset: number, client: WebClient): Promise<string> {
         const statuses = await this.statusDao.getChannelDataForDate(channelId, date, timezoneOffset);
 
-        let displayItems: ParkingLotDisplayItem[] = [];
+        let displayItems: ParkingLotDisplayItem[];
         let proms = statuses.filter(s => s.parkingLot || s.parkingLotAttendees && s.parkingLotAttendees.length > 0).map(async i => {
             let item = new ParkingLotDisplayItem();
             let u = await this.queryUser(i.userId, client);
@@ -280,6 +287,12 @@ export class SlackBot {
         }
     }
 
+    /**
+     * Build the edit message blocks, for sending via the chat API.
+     * @param cmd
+     * @param channelId
+     * @param userId
+     */
     public buildChatMessageEditDialog(cmd: ChangeMessageCommand, channelId: string, userId: string) {
         const msg = "Edit Status";
         const blocks = this.viewBuilder.buildChatMessageEditBlocks(cmd, msg);
@@ -291,6 +304,14 @@ export class SlackBot {
         }
     }
 
+    /**
+     * Build the scheduled message dialog and blocks, for sending via the chat API.
+     * @param cmd
+     * @param channelId
+     * @param userId
+     * @param timezone
+     * @param args
+     */
     public buildScheduledMessageDialog(cmd: ChangeMessageCommand, channelId: string, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
         const dateStr = formatDateToPrintable(cmd.postAt, timezone);
         const msg = "Your status below is scheduled to send on\n " + dateStr;
@@ -305,6 +326,12 @@ export class SlackBot {
         }
     }
 
+    /**
+     * Build an ephemeral message for the user, for sending via the chat API.
+     * @param channelId
+     * @param userId
+     * @param message
+     */
     public buildEphemeralContextMessage(channelId: string, userId: string, message: string): ChatPostEphemeralArguments {
         const msg = this.viewBuilder.buildSimpleContextBlock(message);
         return {
@@ -316,7 +343,7 @@ export class SlackBot {
     }
 
     /**
-     * Delete the message based on its ID
+     * Delete the message based on its ID, which is sent in the command.
      *
      * @param command
      * @param client
@@ -364,14 +391,30 @@ export class SlackBot {
         return "Invalid delete command";
     }
 
+    /**
+     * Delegate to viewBuilder to build a simple error message modal view.
+     * @param msg
+     */
     public buildErrorView(msg: string): ModalView {
         return this.viewBuilder.buildErrorView(msg);
     }
 
+    /**
+     * Delegate to viewBuilder to build a simple error message for ephemeral messages.
+     * @param channelId
+     * @param userId
+     * @param msg
+     */
     public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments {
         return this.viewBuilder.buildErrorMessage(channelId, userId, msg);
     }
 
+    /**
+     * Validate that the bot is a member of the channel. Returns true if it is, false otherwise.
+     * @param channelId
+     * @param botId
+     * @param client
+     */
     async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
         const channelData = await client.conversations.members({
             channel: channelId,
@@ -393,6 +436,12 @@ export class SlackBot {
             return resp.user?.tz!;
         });
     }
+
+    /**
+     * Get the user's timezone offset in minutes.
+     * @param userId
+     * @param client
+     */
     public getUserTimezoneOffset(userId: string, client: WebClient): Promise<number> {
         return client.users.info({
             user: userId

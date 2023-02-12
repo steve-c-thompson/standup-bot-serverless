@@ -9,7 +9,6 @@ import {formatDateToPrintable} from "./utils/datefunctions";
 import {ChangeMessageCommand} from "./bot/Commands";
 import {ACTION_NAMES} from "./bot/ViewConstants";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
-import {PrivateMetadata} from "./dto/PrivateMetadata";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -108,7 +107,7 @@ const init = async () => {
      * Much of the functionality relies on `PrivateMetaData.messageType` to determine what output to create,
      * as well as data received in the submission. Data is crucial because it identifies the message to update or delete.
      *
-     * If a messageId comes in from the metadata, assume this is a status we must update (posted) or delete (scheduled).
+     * If a messageId comes in from the metadata, assume this is a status we must update (posted) or delete and update (scheduled).
      *
      * If there is no messageId, create new statuses.
      *
