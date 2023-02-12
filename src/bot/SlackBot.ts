@@ -346,16 +346,18 @@ export class SlackBot {
      * Delete the message based on its ID, which is sent in the command.
      *
      * @param command
+     * @param channelId
+     * @param userId
      * @param client
      * @param logger
      */
-    public async deleteScheduledMessage(command: ChangeMessageCommand, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments | string> {
+    public async deleteScheduledMessage(command: ChangeMessageCommand, channelId: string, userId: string, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments> {
 
         if (command) {
             try {
                 const status = await this.statusDao.getStandupStatusByMessageId(command.messageId);
-                logger.info(`Deleting message ${command?.messageId} for user ${status?.userId} in channel ${status?.channelId}`);
                 if (status) {
+                    logger.info(`Deleting message ${command?.messageId} for user ${status?.userId} in channel ${status?.channelId}`);
                     const result = await client.chat.deleteScheduledMessage(
                         {
                             channel: status.channelId,
@@ -373,7 +375,11 @@ export class SlackBot {
                             user: status.userId
                         };
                     }
-                    return result.error!.toString();
+                    return this.buildErrorMessage(channelId, userId, result.error!.toString());
+                }
+                else {
+                    logger.info(`No status found for message ID ${command.messageId}`);
+                    return this.buildErrorMessage(channelId, userId,`No status found for message ID ${command.messageId}. Perhaps it was already deleted.`);
                 }
             } catch (e) {
                 let errorMsg = (e as Error).message;
@@ -388,7 +394,7 @@ export class SlackBot {
                 await this.statusDao.removeStandupStatusByMessageId(command.messageId);
             }
         }
-        return "Invalid delete command";
+        return this.buildErrorMessage(channelId, userId,"Invalid delete command");
     }
 
     /**
