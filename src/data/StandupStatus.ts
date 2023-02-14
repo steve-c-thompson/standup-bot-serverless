@@ -76,4 +76,7 @@ export class StandupStatus {
 
     @attribute()
     messageType: StandupStatusType;
+
+    @attribute()
+    postAt?: Date;
 }

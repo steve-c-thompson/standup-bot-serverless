@@ -1,4 +1,4 @@
-import {Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
+import {HomeView, Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
 import {
     ChatPostMessageArguments,
     ChatScheduleMessageArguments,
@@ -214,7 +214,8 @@ export class SlackBot {
             parkingLot: viewInput.parkingLot ? viewInput.parkingLot : undefined,
             scheduleDateStr: viewInput.dateStr ? viewInput.dateStr : undefined,
             scheduleTimeStr: viewInput.timeStr ? viewInput.timeStr : undefined,
-            messageType: messageType
+            messageType: messageType,
+            postAt: viewInput.pm.messageDate? new Date(viewInput.pm.messageDate) : undefined,
         });
     }
 
@@ -455,4 +456,13 @@ export class SlackBot {
             return resp.user?.tz_offset! / 60; // convert to minutes
         });
     }
+
+    // public buildHomeScreen(userId: string, statuses: StandupStatus[], client: WebClient): HomeView {
+    //     return client.views.publish({
+    //         user_id: userId,
+    //         view: this.viewBuilder.buildHomeView()
+    //     }).then(resp => {
+    //         return resp.view!;
+    //     });
+    // }
 }

@@ -3,6 +3,7 @@ import {context} from "../utils/context";
 import {createStandupStatus, jan1, jan2} from "../test/scripts/create-dynamodb";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {StandupStatus} from "./StandupStatus";
+import moment from "moment";
 
 const jan1Zero = new Date(jan1.getTime());
 jan1Zero.setUTCHours(0, 0, 0, 0);
@@ -31,7 +32,8 @@ beforeEach(async () => {
         scheduleDateStr: "10/20/2020",
         scheduleTimeStr: "09:08",
         messageId: "12345",
-        timeToLive: jan2Zero
+        timeToLive: jan2Zero,
+        postAt: jan1TwelvePmTz
     });
     const status2: StandupStatus = new StandupStatus({
         id: "ABC#" + jan2Zero.getTime(),
@@ -79,6 +81,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status?.scheduleTimeStr).toEqual("09:08");
             expect(status?.messageId).toEqual("12345");
             expect(status?.timeToLive).toEqual(jan2Zero);
+            expect(status?.postAt).toEqual(jan1TwelvePmTz);
         });
         it("existing entity when utc date is tomorrow", async () => {
             // offset should put us back to Jan 1
@@ -119,6 +122,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status?.scheduleTimeStr).toEqual("09:08");
             expect(status?.messageId).toEqual("99999");
             expect(status?.timeToLive).toEqual(jan2Zero);
+            expect(status?.postAt).toBeFalsy();
         });
     });
     describe("should retrieve", () => {
@@ -169,7 +173,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
     describe("should put", () => {
         it("an entity with zeroed createDate and ttl = create + 1 day", async () => {
             const standupDate = new Date();
-            const zeroDate = new Date();
+            const zeroDate = new Date(standupDate.getTime());
+            zeroDate.setMinutes(standupDate.getMinutes() + tzOffset);
             zeroDate.setUTCHours(0, 0, 0, 0);
             const expectedTtl = new Date(zeroDate.getTime());
             expectedTtl.setDate(zeroDate.getDate() + 1);
@@ -186,6 +191,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
                 messageId: "12345",
                 timeToLive: expectedTtl,
                 userTimezoneOffset: tzOffset,
+                postAt: jan1TwelvePmTz
             });
             const saved = await dao.putData("ABC", standupDate, "Jimmy", status, tzOffset);
             expect(saved).toBeTruthy();
@@ -204,6 +210,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.scheduleDateStr).toEqual("10/20/2020");
             expect(saved.scheduleTimeStr).toEqual("09:08");
             expect(saved.messageId).toEqual("12345");
+            expect(saved.postAt).toEqual(jan1TwelvePmTz);
         });
         it("an entity with timezone where utc date is different from local date", async () => {
             const standupDate = new Date("2021-10-20T18:00:00.000-07:00"); // 6PM

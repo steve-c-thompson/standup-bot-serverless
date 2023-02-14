@@ -161,6 +161,7 @@ const init = async () => {
                 try {
                     const saveDate = new Date(viewInput.scheduleDateTime);
                     viewInput.pm.messageId = scheduleResponse.scheduled_message_id!;
+                    viewInput.pm.messageDate = saveDate.getTime();
                     // timezone is assumed present with scheduleDateTime
                     await slackBot.saveStatusData(viewInput, saveDate, "scheduled", viewInput.timezone!);
                 } catch (e) {
@@ -217,6 +218,7 @@ const init = async () => {
                     const result = await client.chat.postMessage(chatMessageArgs);
                     const standupDate = new Date();
                     viewInput.pm.messageId = result.ts!;
+                    viewInput.pm.messageDate = standupDate.getTime();
                     const tz = await slackBot.getUserTimezone(userId, client);
                     try {
                         await slackBot.saveStatusData(viewInput, standupDate, "posted", tz);
