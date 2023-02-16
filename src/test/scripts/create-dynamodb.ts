@@ -17,7 +17,7 @@ export async function createStandupStatus() {
             readCapacityUnits: 5,
             writeCapacityUnits: 5,
             indexOptions: {
-                "messageId-index": {
+                "userId-index": {
                     type: 'global',
                     readCapacityUnits: 1,
                     writeCapacityUnits: 1,

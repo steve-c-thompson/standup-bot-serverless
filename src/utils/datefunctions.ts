@@ -1,8 +1,14 @@
 import moment from "moment-timezone";
 
-export function formatDateToPrintable(dateTime: number | string, timezone: string): string {
+export function formatDateToPrintableWithTime(dateTime: number | string, timezone: string): string {
     const m = moment(dateTime).tz(timezone);
     return m.format("M/D/YYYY") + " at " + m.format("h:mm A");
+}
+
+export function formatUtcDateToPrintable(dateTime: number): string {
+    const m = moment.utc(dateTime);
+
+    return m.format("M/D/YYYY");
 }
 
 export function adjustDateAndTimeForTimezone(dateStr: string | null | undefined,
