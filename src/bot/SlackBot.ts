@@ -372,6 +372,9 @@ export class SlackBot {
             const msg = this.viewBuilder.buildSimpleContextBlock(message);
             blocks.unshift(msg);
         }
+        else {
+            message = " ";
+        }
         return {
             channel: channelId,
             user: userId,

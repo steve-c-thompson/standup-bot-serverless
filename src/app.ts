@@ -15,6 +15,7 @@ import {ChangeMessageCommand} from "./bot/Commands";
 import {ACTION_NAMES} from "./bot/ViewConstants";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
+import {Timer} from "./utils/Timer";
 
 let app: App;
 const dataSource = new AwsSecretsDataSource(context.secretsManager);
@@ -25,6 +26,8 @@ const logLevel = LogLevel.INFO;
 
 const blockId = new RegExp("change-msg-.*");
 
+const timerEnabled = true;
+
 /**
  * This is a slack bot that allows users to enter their standup status.
  *
@@ -32,6 +35,9 @@ const blockId = new RegExp("change-msg-.*");
  * https://slack.dev/bolt-js/tutorial/getting-started
  *
  * See the README for how to configure the bot
+ *
+ * async init() function is used to initialize the bot. This is called from the lambda handler, and used
+ * so that we can avoid initializing the bot on every lambda invocation.
  */
 const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
@@ -141,8 +147,10 @@ const init = async () => {
      * rescheduled or posted directly to the channel.
      */
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
-        logger.debug("Handling standup-view submit");
-        // logger.info("standup-view body: " + JSON.stringify(body, null, 2));
+        let timer = new Timer();
+        if(timerEnabled) {
+            timer.startTimer();
+        }
         const viewInput = slackBot.getViewInputValues(view);
         const botId = body.view.bot_id;
 
@@ -151,6 +159,9 @@ const init = async () => {
             return;
         }
         await ack();
+        if(timerEnabled) {
+            timer.logElapsed("Acknowledge view submission", logger);
+        }
         try {
             // When a messageId is present we are editing a message
             const isEdit: boolean = !!viewInput.pm.messageId;
@@ -317,6 +328,6 @@ const initPromise = init();
 // Handle the Lambda function event
 module.exports.handler = async (event: APIGatewayProxyEvent, context: any, callback: any) => {
     const handler = await initPromise;
-    logger.debug("EVENT RECEIVED " + JSON.stringify(event));
+    // logger.debug("EVENT RECEIVED " + JSON.stringify(event));
     return handler(event, context, callback);
 }
