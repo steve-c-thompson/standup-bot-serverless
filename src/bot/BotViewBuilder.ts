@@ -575,6 +575,8 @@ export class BotViewBuilder {
             }
         );
 
+        // Make a map out of the attendeeInfos for easy lookup
+        const attendeeInfoMap = new Map(attendeeInfos.map(a => [a.userId, a]));
         try {
             let standupStatuses = messages.flatMap(m => {
                 // for each message, build a section block. Do not do any timezone shift for standup date
@@ -587,8 +589,12 @@ export class BotViewBuilder {
                 }];
                 mBlocks.push(...m.statusMessages.flatMap(s => {
                     const sBlocks = [];
+                    // for each status figure out which attendees are needed, and use filter to remove empty values
+                    const attendees: UserInfo[] = s.parkingLotAttendees!.map(p => {
+                       return attendeeInfoMap.get(p);
+                    }).filter(Boolean) as UserInfo[];
 
-                    sBlocks.push(...this.buildChatMessageOutputBlocks(s.messageType, userInfo, s.yesterday, s.today, s.parkingLot, s.pullRequests, attendeeInfos));
+                    sBlocks.push(...this.buildChatMessageOutputBlocks(s.messageType, userInfo, s.yesterday, s.today, s.parkingLot, s.pullRequests, attendees));
                     const cmd = new ChangeMessageCommand(s.messageId, s.channelId, s.userId, s.messageDate.getTime());
                     if (s.messageType === "posted") {
                         sBlocks.push(...this.buildChatMessageEditBlocks(cmd, "Edit Status"));
