@@ -38,6 +38,8 @@ const timerEnabled = true;
  *
  * async init() function is used to initialize the bot. This is called from the lambda handler, and used
  * so that we can avoid initializing the bot on every lambda invocation.
+ *
+ * https://serverlessfirst.com/function-initialisation/
  */
 const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
@@ -54,7 +56,7 @@ const init = async () => {
     app = new App({
         token: slackBotToken,
         receiver: awsLambdaReceiver,
-        logLevel: logLevel
+        logLevel: logLevel,
     });
 
     /**
@@ -282,7 +284,7 @@ const init = async () => {
     /**
      * Handle the action of a button press from the change-msg block in the posted message.
      */
-    app.action({block_id: blockId}, async ({body, ack, logger, client}) => {
+    app.action({block_id: blockId}, async ({ack, body, client, logger}) => {
             // logger.info("Action received: ", JSON.stringify(body, null, 2));
             try {
                 await ack();
@@ -324,6 +326,7 @@ const init = async () => {
 
     return await awsLambdaReceiver.start();
 }
+// Store the init promise in module scope so that subsequent calls to init() return the resolved promise
 const initPromise = init();
 
 // Handle the Lambda function event
