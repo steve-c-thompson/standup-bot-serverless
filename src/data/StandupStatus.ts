@@ -4,7 +4,6 @@ import {embed} from "@aws/dynamodb-data-mapper";
 
 export type StandupStatusType = "posted" | "scheduled";
 
-// TODO need channelId and userId in message
 export class StatusMessage {
     public constructor(init?:Partial<StatusMessage>) {
         Object.assign(this, init);

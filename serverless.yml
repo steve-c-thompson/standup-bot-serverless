@@ -22,26 +22,24 @@ resources:
             AttributeType: "S"
           - AttributeName: "userId"
             AttributeType: "S"
-          - AttributeName: "messageId"
-            AttributeType: "S"
         KeySchema:
           - AttributeName: "id"
             KeyType: "HASH"
           - AttributeName: "userId"
             KeyType: "RANGE"
         GlobalSecondaryIndexes:
-          - IndexName: "messageId-index"
+          - IndexName: "userId-index"
             KeySchema:
-              - AttributeName: "messageId"
+              - AttributeName: "userId"
                 KeyType: "HASH"
             Projection:
               ProjectionType: "ALL"
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 3
+              WriteCapacityUnits: 2
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 3
+          WriteCapacityUnits: 2
         TableName: ${self:provider.stage}_STANDUP_STATUS
         TimeToLiveSpecification:
           AttributeName: timeToLive

@@ -103,9 +103,10 @@ const init = async () => {
         } else {
             try {
                 let payload = await slackBot.buildNewMessageModalView(body, client);
-                const result = slackBot.messageWithSlackApi(body.user_id, today, client, "views.open",
+                const result = await slackBot.messageWithSlackApi(body.user_id, today, client, "views.open",
                     payload
                     , false);
+                // const result = await client.views.open(payload);
                 logger.debug(result);
             } catch (error) {
                 logger.error(error);
