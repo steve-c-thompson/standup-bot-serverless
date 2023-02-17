@@ -1,12 +1,15 @@
-import {ChatScheduleMessageArguments, KnownBlock, PlainTextInput, Timepicker, ViewsOpenArguments} from "@slack/web-api";
+import {KnownBlock, PlainTextInput, Timepicker, ViewsOpenArguments} from "@slack/web-api";
 import {
     ActionsBlock,
     Block,
     Button,
-    ContextBlock, Datepicker,
-    HeaderBlock, HomeView,
+    ContextBlock,
+    Datepicker,
+    HeaderBlock,
+    HomeView,
     InputBlock,
-    ModalView, MultiUsersSelect,
+    ModalView,
+    MultiUsersSelect,
     SectionBlock
 } from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
@@ -18,8 +21,6 @@ import {PrivateMetadata} from "../dto/PrivateMetadata";
 import {logger} from "../utils/context";
 import {StandupStatus, StandupStatusType} from "../data/StandupStatus";
 import {formatDateToPrintableWithTime, formatUtcDateToPrintable} from "../utils/datefunctions";
-import moment, {tz} from "moment-timezone";
-import {TemporalField, ZoneOffset} from "@js-joda/core";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -273,27 +274,6 @@ export class BotViewBuilder {
         return d;
     }
 
-    /**
-     * Build a message to post in chat. This message contains buttons which deliver payloads that
-     * an action handler can parse to determine which message to delete or edit.
-     *
-     * @param cmd
-     * @param timezone`
-     * @param args
-     * @param msg
-     */
-    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, timezone: string, args: ChatScheduleMessageArguments, msg: string): Block[] {
-        const blocks = this.buildScheduledMessageEditAndDeleteBlocks(cmd, msg);
-
-        // Now add the message contents
-        blocks.push(...args.blocks!);
-        blocks!.push(
-            {
-                type: "divider"
-            });
-        return blocks;
-    }
-
     private buildScheduledMessageEditAndDeleteBlocks(cmd: ChangeMessageCommand, msg: string): Block[] {
         const blocks: KnownBlock[] = [
             {
@@ -515,8 +495,8 @@ export class BotViewBuilder {
                 // for each attendee, use their given id
                 let attendeeList = i.attendeeIds!.map(a => {
                     return this.atMember(a);
-                }).join(", ");
-                return "*" + i.userName + "*\n" + this.formatTextNumbersToStories(i.content) + "\n*Attendees*: " + attendeeList;
+                }).join(" ");
+                return "*" + i.userName + "*\n" + this.formatTextNumbersToStories(i.content) + "\n*Attendees*: " + (attendeeList.length > 0 ? attendeeList : "None");
             }).flat();
             return out.join("\n");
         }
@@ -634,5 +614,19 @@ export class BotViewBuilder {
 
 
         return view;
+    }
+
+    buildAppHomeLinkBlocks(appId: string, teamId: string | null, linkMsg: string) : KnownBlock[] {
+        return [
+            {
+                type: "context",
+                elements: [
+                    {
+                        type: "mrkdwn",
+                        text: linkMsg
+                    }
+                ]
+            }
+        ];
     }
 }

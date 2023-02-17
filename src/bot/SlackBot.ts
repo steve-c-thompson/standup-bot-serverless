@@ -1,9 +1,9 @@
-import {Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
+import {Block, Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
 import {
-    ChannelsInfoResponse,
+    ChannelsInfoResponse, ChatDeleteScheduledMessageResponse,
     ChatPostMessageArguments,
     ChatScheduleMessageArguments,
-    ChatUpdateArguments,
+    ChatUpdateArguments, KnownBlock,
     ViewsOpenArguments,
     WebAPICallOptions, WebAPICallResult,
     WebClient
@@ -228,7 +228,6 @@ export class SlackBot {
         const statusMsg = this.viewInputToStatusData(viewInput, messageType);
         try {
             await this.statusDao.addStatusMessage(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, statusMsg, tz);
-
         } catch (e) {
             logger.error(e);
         }
@@ -317,40 +316,66 @@ export class SlackBot {
         }
     }
 
-    /**
-     * Build the scheduled message dialog and blocks, for sending via the chat API.
-     * @param cmd
-     * @param channelId
-     * @param userId
-     * @param timezone
-     * @param args
-     */
-    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, channelId: string, userId: string, timezone: string, args: ChatScheduleMessageArguments): ChatPostEphemeralArguments {
+    private buildScheduledMessageConfirmation(cmd: ChangeMessageCommand, timezone: string) {
         const dateStr = formatDateToPrintableWithTime(cmd.postAt, timezone);
-        const msg = "Your status below is scheduled to send on\n " + dateStr;
+        const msg = "Your status is scheduled to send on\n " + dateStr;
+        return msg;
+    }
 
-        const blocks = this.viewBuilder.buildScheduledMessageDialog(cmd, timezone, args, msg);
+    /***
+     * Build the scheduled message confirmation and link blocks, for sending via the chat API. This outputs
+     * message contents and then a link to the app home tab.
+     * @param cmd
+     * @param timezone
+     * @param appId
+     * @param teamId
+     * @param messageContents
+     */
+    public buildScheduledMessageConfirmationAndLink(cmd: ChangeMessageCommand, timezone: string, appId: string, teamId: string, messageContents: (Block | KnownBlock)[]): ChatPostEphemeralArguments {
+        const blocks = [...messageContents];
+        const msg = this.buildScheduledMessageConfirmation(cmd, timezone);
+        const msgBlock: KnownBlock = {
+            type: "context",
+            elements: [{
+                type: "mrkdwn",
+                text: msg
+            }]
+        };
+        blocks.push(msgBlock);
 
+        const linkBlocks = this.buildAppHomeLinkBlocks(appId, teamId);
+
+        blocks.push(...linkBlocks);
         return {
-            channel: channelId,
-            user: userId,
             text: msg,
-            blocks: blocks
+            blocks: blocks,
+            channel: cmd.channelId,
+            user: cmd.userId
         }
+    }
+
+    buildAppHomeLinkBlocks(appId: string, teamId: string) {
+        const link = this.buildAppHomeLink(appId, teamId);
+        const linkBlocks = this.viewBuilder.buildAppHomeLinkBlocks(appId, teamId, link);
+        return linkBlocks;
     }
 
     /**
      * Build an ephemeral message for the user, for sending via the chat API.
      * @param channelId
      * @param userId
+     * @param blocks
      * @param message
      */
-    public buildEphemeralContextMessage(channelId: string, userId: string, message: string): ChatPostEphemeralArguments {
-        const msg = this.viewBuilder.buildSimpleContextBlock(message);
+    public buildEphemeralContextMessage(channelId: string, userId: string, blocks: Block[] = [], message?: string): ChatPostEphemeralArguments {
+        if(message){
+            const msg = this.viewBuilder.buildSimpleContextBlock(message);
+            blocks.unshift(msg);
+        }
         return {
             channel: channelId,
             user: userId,
-            blocks: [msg],
+            blocks: blocks,
             text: message
         }
     }
@@ -392,12 +417,12 @@ export class SlackBot {
 
     private async deleteMessageFromSlack(logger: Logger, command: ChangeMessageCommand, userId: string, channelId: string, client: WebClient, message?: string): Promise<ChatPostEphemeralArguments | ChatPostMessageArguments> {
         logger.info(`Deleting message ${command?.messageId} for user ${userId} in channel ${channelId}`);
-        const result = await client.chat.deleteScheduledMessage(
+        const result = await this.messageWithSlackApi(command.userId, new Date(command.postAt), client, "chat.deleteScheduledMessage",
             {
                 channel: channelId,
                 scheduled_message_id: command.messageId,
             }
-        );
+        ) as ChatDeleteScheduledMessageResponse;
         if (result.ok) {
             let msg = `Status with Slack message ID ${command.messageId} deleted from Slack.`;
             if (message) {
@@ -525,7 +550,7 @@ export class SlackBot {
     async messageWithSlackApi(userId: string, today: Date, client: WebClient, method: string, args: WebAPICallOptions,
                               updateHomeScreen: boolean = false): Promise<WebAPICallResult> {
         const result = await client.apiCall(method, args);
-        if(updateHomeScreen){
+        if (updateHomeScreen) {
             try {
                 logger.debug("Updating home screen after messageWithSlackApi call");
                 await this.updateHomeScreen(userId, today, client);
@@ -547,5 +572,13 @@ export class SlackBot {
             channelMap.set(c.channel!.id!, c.channel!.name!);
         });
         return channelMap;
+    }
+
+    private buildAppHomeLink(appId: string, teamId: string | null): string {
+        const linkMsg = ["Manage your standup status messages in the ", "Standup App's Home tab"];
+        if (!teamId) {
+            return linkMsg.join("");
+        }
+        return `${linkMsg[0]}<slack://app?team=${teamId}&id=${appId}&tab=home|${linkMsg[1]}>`;
     }
 }
