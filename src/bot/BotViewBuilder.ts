@@ -1,22 +1,26 @@
-import {ChatScheduleMessageArguments, KnownBlock, PlainTextInput, Timepicker, ViewsOpenArguments} from "@slack/web-api";
+import {KnownBlock, PlainTextInput, Timepicker, ViewsOpenArguments} from "@slack/web-api";
 import {
     ActionsBlock,
     Block,
     Button,
-    ContextBlock, Datepicker,
+    ContextBlock,
+    Datepicker,
     HeaderBlock,
+    HomeView,
     InputBlock,
-    ModalView, MultiUsersSelect,
+    ModalView,
+    MultiUsersSelect,
     SectionBlock
 } from "@slack/bolt";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {StandupDialogMessageType} from "./SlackBot";
 import {ChangeMessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
 import {logger} from "../utils/context";
+import {StandupStatus, StandupStatusType} from "../data/StandupStatus";
+import {formatDateToPrintableWithTime, formatUtcDateToPrintable} from "../utils/datefunctions";
 
 export class ParkingLotDisplayItem {
     userName: string
@@ -34,7 +38,7 @@ export class BotViewBuilder {
      *
      * @param trigger_id
      * @param pm
-     * @param userInfo
+     * @param userInfo passed in to pre-populate the user's timezone for the timepicker
      * @param blockData
      */
     public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo, blockData?: StandupViewData): ViewsOpenArguments {
@@ -167,8 +171,9 @@ export class BotViewBuilder {
                 }
             }
         };
-        // If this is a post or scheduled message, add the option to schedule it
-        if(pm.messageType === "post" || pm.messageType === "scheduled") {
+        // If this is a new or scheduled message, add the schedule date and time inputs
+        // If it has been posted, we can't show these
+        if (pm.messageType === "scheduled" || !pm.messageId) {
             args.view.blocks.push({
                     type: "input",
                     block_id: "schedule-date",
@@ -200,22 +205,22 @@ export class BotViewBuilder {
                 },);
         }
 
-        if(blockData) {
+        if (blockData) {
             this.loadBlock(args, "yesterday", blockData.yesterday);
             this.loadBlock(args, "today", blockData.today);
-            if(blockData.parkingLot){
+            if (blockData.parkingLot) {
                 this.loadBlock(args, "parking-lot", blockData.parkingLot);
             }
-            if(blockData.attendees){
+            if (blockData.attendees) {
                 this.loadBlock(args, "parking-lot-participants", blockData.attendees);
             }
-            if(blockData.pullRequests){
+            if (blockData.pullRequests) {
                 this.loadBlock(args, "pull-requests", blockData.pullRequests);
             }
-            if(blockData.dateStr) {
+            if (blockData.dateStr) {
                 this.loadBlock(args, "schedule-date", blockData.dateStr);
             }
-            if(blockData.timeStr) {
+            if (blockData.timeStr) {
                 this.loadBlock(args, "schedule-time", blockData.timeStr);
             }
         }
@@ -232,8 +237,8 @@ export class BotViewBuilder {
      */
     private loadBlock(viewArgs: ViewsOpenArguments, blockId: string, blockValue: string | string[]) {
         const block: Block | undefined = this.findBlockById(viewArgs, blockId);
-        if(block as InputBlock) {
-            switch((block as InputBlock).element.type) {
+        if (block as InputBlock) {
+            switch ((block as InputBlock).element.type) {
                 case "plain_text_input":
                     ((block as InputBlock).element as PlainTextInput).initial_value = blockValue as string;
                     break;
@@ -250,7 +255,7 @@ export class BotViewBuilder {
         }
     }
 
-    private findBlockById(viewArgs: ViewsOpenArguments, blockId: string): Block | undefined{
+    private findBlockById(viewArgs: ViewsOpenArguments, blockId: string): Block | undefined {
         return viewArgs.view.blocks.find(b => b.block_id === blockId);
     }
 
@@ -269,48 +274,32 @@ export class BotViewBuilder {
         return d;
     }
 
-    /**
-     * Build a message to post in chat. This message contains buttons which deliver payloads that
-     * an action handler can parse to determine which message to delete or edit.
-     *
-     * @param cmd
-     * @param timezone`
-     * @param args
-     * @param msg
-     */
-    public buildScheduledMessageDialog(cmd: ChangeMessageCommand, timezone: string, args: ChatScheduleMessageArguments, msg: string): Block[] {
-        const blocks = [
-                {
-                    type: "section",
-                    text: {
-                        type: "plain_text",
-                        text: msg
-                    },
+    private buildScheduledMessageEditAndDeleteBlocks(cmd: ChangeMessageCommand, msg: string): Block[] {
+        const blocks: KnownBlock[] = [
+            {
+                type: "section",
+                text: {
+                    type: "plain_text",
+                    text: msg
                 },
-                this.buildChangeMessageActions(this.buildDeleteButton(cmd, ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE")!, "Delete Scheduled Status"), this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE")!, "Edit Scheduled Status")),
-                {
-                    type: "divider"
-                }
-            ];
-
-        // Now add the message contents
-        blocks.push(...args.blocks!);
-        blocks!.push(
+            },
+            this.buildChangeMessageActions(cmd.messageId, this.buildDeleteButton(cmd, ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE")!, "Delete Scheduled Status"), this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE")!, "Edit Scheduled Status")),
             {
                 type: "divider"
-            });
+            }
+        ];
         return blocks;
     }
 
-    private buildChangeMessageActions(...buttons : Button[]): ActionsBlock {
+    private buildChangeMessageActions(id: string, ...buttons: Button[]): ActionsBlock {
         return {
             type: "actions",
-            block_id: "change-msg",
+            block_id: "change-msg-" + id,
             elements: buttons
         };
     }
 
-    private buildDeleteButton(cmd: ChangeMessageCommand, actionId:string, msg: string): Button{
+    private buildDeleteButton(cmd: ChangeMessageCommand, actionId: string, msg: string): Button {
         return {
             type: "button",
             style: "danger",
@@ -342,8 +331,8 @@ export class BotViewBuilder {
     }
 
     /**
-     * Create the output to post in chat.
-     * @param: messageType
+     * Create the output blocks to post in chat.
+     *
      * @param messageType
      * @param userInfo Object that allows us access to user's image and name
      * @param yesterday
@@ -352,32 +341,33 @@ export class BotViewBuilder {
      * @param pullRequests
      * @param parkingLotAttendees UserInfo objects so we can get each user's image and name
      */
-    public buildChatMessageOutputBlocks(messageType: StandupDialogMessageType,
+    public buildChatMessageOutputBlocks(messageType: StandupStatusType,
                                         userInfo: UserInfo,
                                         yesterday: string, today: string,
                                         parkingLotItems: string | null | undefined,
                                         pullRequests: string | null | undefined,
                                         parkingLotAttendees: UserInfo[]) {
+        logger.debug("Building chat message output blocks for " + userInfo.name + " with message type " + messageType);
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = []
-        blocks.push  ({
-                type: "header",
-                block_id: "header-block",
-                text: {
-                    type: "plain_text",
-                    text: userInfo.name + " :speaking_head_in_silhouette:",
-                }
-            });
+        // This set of blocks can show up many times on the homepage, so do not give blocks IDs
+        blocks.push({
+            type: "header",
+            text: {
+                type: "plain_text",
+                text: userInfo.name + " :speaking_head_in_silhouette:",
+            }
+        });
         // if this is a scheduled message, add the user's face
-        if(messageType === "scheduled") {
+        if (messageType === "scheduled") {
             blocks.push({
-               type: "context",
-               elements: [
-                   {
-                       type: "image",
-                       image_url: userInfo.img!,
-                       alt_text: userInfo.name
-                   }
-               ]
+                type: "context",
+                elements: [
+                    {
+                        type: "image",
+                        image_url: userInfo.img!,
+                        alt_text: userInfo.name
+                    }
+                ]
             });
         }
         blocks.push(
@@ -421,36 +411,32 @@ export class BotViewBuilder {
             );
         }
         if (parkingLotAttendees.length > 0) {
-            try {
-                // Text output
-                const memberOutput = this.formatMembersForOutput(parkingLotAttendees, ", ") + "\n";
-                const context: ContextBlock = {
-                    type: "context",
-                    elements: []
-                };
-                parkingLotAttendees.forEach(m => {
-                    context.elements.push(
-                        {
-                            type: "image",
-                            image_url: m.img!,
-                            alt_text: m.name
-                        }
-                    );
-                });
 
-                blocks.push({
-                        type: "section",
-                        text: {
-                            type: "mrkdwn",
-                            text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
-                        }
-                    },
-                    context
+            // Text output
+            const memberOutput = this.formatMembersForOutput(parkingLotAttendees, " ") + "\n";
+            const context: ContextBlock = {
+                type: "context",
+                elements: []
+            };
+            parkingLotAttendees.forEach(m => {
+                context.elements.push(
+                    {
+                        type: "image",
+                        image_url: m.img!,
+                        alt_text: m.name
+                    }
                 );
+            });
 
-            } catch (e) {
-                logger.error(e);
-            }
+            blocks.push({
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: ":busts_in_silhouette: *Parking Lot Attendees*\n" + memberOutput
+                    }
+                },
+                context
+            );
         }
 
         return blocks;
@@ -475,7 +461,7 @@ export class BotViewBuilder {
         return "<@" + id + ">";
     }
 
-    public buildSimpleContextBlock(msg: string)   {
+    public buildSimpleContextBlock(msg: string): ContextBlock {
         return {
             type: "context",
             elements: [{
@@ -499,18 +485,22 @@ export class BotViewBuilder {
             }
         }];
 
-        blocks.push(this.buildChangeMessageActions(this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_MESSAGE")!,msg)));
+        blocks.push(this.buildChangeMessageActions(cmd.messageId, this.buildEditButton(cmd, ACTION_NAMES.get("EDIT_MESSAGE")!, msg)));
         return blocks;
     }
 
+    /**
+     * Create a string of parking lot items. When there are no parking lot attendees, the Attendees list will say "None".
+     * @param pItems
+     */
     public buildParkingLotDisplayItems(pItems: ParkingLotDisplayItem[]): string {
         if (pItems.length > 0) {
             let out = pItems.map(i => {
                 // for each attendee, use their given id
                 let attendeeList = i.attendeeIds!.map(a => {
                     return this.atMember(a);
-                }).join(", ");
-                return "*" + i.userName + "*\n" + this.formatTextNumbersToStories(i.content) + "\n*Attendees*: " + attendeeList;
+                }).join(" ");
+                return "*" + i.userName + "*\n" + this.formatTextNumbersToStories(i.content) + "\n*Attendees*: " + (attendeeList.length > 0 ? attendeeList : "None");
             }).flat();
             return out.join("\n");
         }
@@ -571,5 +561,77 @@ export class BotViewBuilder {
             ],
             text: msg
         };
+    }
+
+    /**
+     * Build the contents of the Home tab by querying for all messages for the current day, and beyond for the case of scheduled messages.
+     * @param messages
+     * @param userInfo
+     * @param attendeeInfos
+     * @param channelIdNameMap
+     * @param today
+     * @param tzOffset
+     */
+    buildHomeScreen(messages: StandupStatus[], userInfo: UserInfo, attendeeInfos: UserInfo[], channelIdNameMap: Map<string, string>, today: Date, tzOffset: number): HomeView {
+        const blocks: KnownBlock[] = [];
+        const view: HomeView = {
+            type: "home",
+            blocks: blocks,
+        }
+        blocks.push(
+            {
+                type: "header",
+                text: {
+                    type: "plain_text",
+                    text: "Standup Statuses",
+                }
+            }
+        );
+
+        // Make a map out of the attendeeInfos for easy lookup
+        const attendeeInfoMap = new Map(attendeeInfos.map(a => [a.userId, a]));
+        try {
+            let standupStatuses = messages.flatMap(m => {
+                // for each message, build a section block. Do not do any timezone shift for standup date
+                const mBlocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = [{
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: "*" + formatUtcDateToPrintable(m.standupDate.getTime()) + " - #" + channelIdNameMap.get(m.channelId) + "*"
+                    }
+                }];
+                mBlocks.push(...m.statusMessages.flatMap(s => {
+                    const sBlocks = [];
+                    // for each status figure out which attendees are needed, and use filter to remove empty values
+                    const attendees: UserInfo[] = s.parkingLotAttendees!.map(p => {
+                       return attendeeInfoMap.get(p);
+                    }).filter(Boolean) as UserInfo[];
+
+                    sBlocks.push(...this.buildChatMessageOutputBlocks(s.messageType, userInfo, s.yesterday, s.today, s.parkingLot, s.pullRequests, attendees));
+                    const cmd = new ChangeMessageCommand(s.messageId, s.channelId, s.userId, s.messageDate.getTime());
+                    if (s.messageType === "posted") {
+                        sBlocks.push(...this.buildChatMessageEditBlocks(cmd, "Edit Status"));
+                    }
+                    if (s.messageType === "scheduled") {
+                        const dateStr = formatDateToPrintableWithTime(s.messageDate.getTime(), tzOffset);
+                        const msg = "Status scheduled to send on " + dateStr;
+                        sBlocks.push(...this.buildScheduledMessageEditAndDeleteBlocks(cmd, msg));
+                    }
+                    // add a divider after each message
+                    sBlocks.push({
+                        type: "divider"
+                    });
+
+                    return sBlocks;
+                }));
+                return mBlocks;
+            });
+            blocks.push(...standupStatuses as (KnownBlock)[]);
+        } catch (e) {
+            logger.error("Error building home screen", e);
+        }
+
+
+        return view;
     }
 }

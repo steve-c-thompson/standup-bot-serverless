@@ -1,12 +1,12 @@
 /**
  * Simple interface for storing data between Slack views
  */
-import {StandupDialogMessageType} from "../bot/SlackBot";
+import {StandupStatusType} from "../data/StandupStatus";
 
 export interface PrivateMetadata {
     channelId?: string;
     userId?: string;
     messageId?: string;
     messageDate?: number;
-    messageType: StandupDialogMessageType
+    messageType: StandupStatusType
 }

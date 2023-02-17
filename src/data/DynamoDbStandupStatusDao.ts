@@ -1,4 +1,4 @@
-import {StandupStatus} from "./StandupStatus";
+import {StandupStatus, StatusMessage} from "./StandupStatus";
 import {StandupStatusDao} from "./StandupStatusDao";
 import {createZeroUtcDate} from "../utils/datefunctions";
 import {DynamoDB} from "aws-sdk";
@@ -37,27 +37,76 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         }
     }
 
-    async getStandupStatusByMessageId(messageId: string): Promise<StandupStatus | null> {
+    async getStandupStatusesByUserId(userId: string, standupDateAfter?: Date, timezoneOffset?: number): Promise<StandupStatus[]> {
         const query = {
-            indexName: "messageId-index",
-            keyCondition: {
-                messageId: messageId
-            },
-            scanIndexForward: true,
-            limit: 1,
+            indexName: "userId-index",
             valueConstructor: StandupStatus,
+            keyCondition: {
+                userId: userId
+            },
+            scanIndexForward: true
         };
         const it: QueryIterator<StandupStatus> = await this.mapper.query(query);
         const arr = [];
+        let calDate;
+        if (standupDateAfter && timezoneOffset) {
+            calDate = this.calibrateStandupDateFromTimezoneOffset(standupDateAfter, timezoneOffset);
+            calDate = createZeroUtcDate(calDate);   // Zero the date for searching
+        }
+        logger.debug(`Getting standup statuses for user ${userId} after date ${calDate?.toISOString()} with timezone offset ${timezoneOffset}`);
         for await (const s of it) {
-            arr.push(s);
+            if (calDate) {
+                if (s.standupDate.getTime() >= calDate.getTime()) {
+                    arr.push(s);
+                }
+            } else {
+                arr.push(s);
+            }
         }
 
-        if (arr.length > 0) {
-            return arr[0];
-        }
+        return arr;
+    }
 
-        return null;
+    /**
+     * Add a status message to the channel data for this channel and date, for this specific user.
+     * If no data exists for this channel and date, create it.
+     * @param channelId
+     * @param standupDate
+     * @param userId
+     * @param data
+     * @param timezoneOffset
+     */
+    async addStatusMessage(channelId: string, standupDate: Date, userId: string, data: StatusMessage, timezoneOffset: number): Promise<StandupStatus> {
+        const status = await this.getChannelData(channelId, standupDate, userId, timezoneOffset);
+        if (status) {
+            // ensure consistency
+            data.userId = userId;
+            data.channelId = channelId;
+            const i = status.statusMessages.findIndex(m => m.messageId === data.messageId)
+            if (i > -1) {
+                // found message, replacing
+                logger.info(`Replacing status message for user ${userId} in channel ${channelId} for date ${standupDate.toISOString()} with messageId ${data.messageId}`);
+                status.statusMessages[i] = data;
+            } else {
+                status.statusMessages.push(data);
+                logger.info(`Adding status message to existing status for user ${userId} in channel ${channelId} for date ${standupDate.toISOString()}`);
+            }
+            return await Promise.resolve(this.mapper.put(status));
+        } else {
+            const newStatus = new StandupStatus({
+                statusMessages: [data],
+            });
+            return await this.putData(channelId, standupDate, userId, newStatus, timezoneOffset);
+        }
+    }
+
+    async getStatusMessage(userId: string, messageId: string): Promise<StatusMessage | undefined> {
+        const standupStatuses = await this.getStandupStatusesByUserId(userId);
+        // Iterate through all statuses and find the one with the matching messageId
+        return standupStatuses.find(s => {
+            const found = s.statusMessages.filter(m => m.messageId === messageId);
+            return found.length > 0;
+        })?.statusMessages.find(m => m.messageId === messageId);
     }
 
     /**
@@ -92,6 +141,12 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         data.channelId = channelId;
         data.standupDate = standupDate;
         data.userId = userId;
+        data.userTimezoneOffset = timezoneOffset;
+        // ensure we keep userId and channelId in sync
+        data.statusMessages.forEach(m => {
+           m.userId = userId;
+           m.channelId = channelId;
+        });
         this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);
         return this.mapper.put(data);
@@ -105,11 +160,16 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
      * @param data
      * @param timezoneOffset
      */
-    async updateData(channelId: string, standupDate: Date, userId: string,data: StandupStatus, timezoneOffset: number): Promise<StandupStatus> {
+    async updateData(channelId: string, standupDate: Date, userId: string, data: StandupStatus, timezoneOffset: number): Promise<StandupStatus> {
         data.channelId = channelId;
         data.standupDate = standupDate;
         data.userId = userId;
         data.updatedAt = new Date();
+        // ensure we keep userId and channelId in sync
+        data.statusMessages.forEach(m => {
+            m.userId = userId;
+            m.channelId = channelId;
+        });
         // ensure we keep the dates aligned
         this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);
@@ -131,10 +191,28 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         return this.mapper.delete(d);
     }
 
-    async removeStandupStatusByMessageId(messageId: string): Promise<StandupStatus | undefined> {
-        const obj = await this.getStandupStatusByMessageId(messageId);
-        if(obj) {
-            return await this.mapper.delete(obj as unknown as StandupStatus);
+    /**
+     * Remove a single message from the standups status for a user. If all messages are removed
+     * the status is removed.
+     * @param userId
+     * @param messageId
+     */
+    async removeStandupStatusMessageByUserIdAndMessageId(userId: string, messageId: string): Promise<StandupStatus | undefined> {
+        const statuses = await this.getStandupStatusesByUserId(userId);
+        // Filter for the status with the message ID, remove the message, update the status and return it
+        const status = statuses.find(s => {
+            const found = s.statusMessages.filter(m => m.messageId === messageId);
+            return found.length > 0;
+        });
+        if (status) {
+            status.statusMessages = status.statusMessages.filter(m => m.messageId !== messageId);
+            if (status.statusMessages.length === 0) {
+                // No messages left, remove the status, but return the whole thing with statuses
+                const d = await this.mapper.delete(status);
+                d!.statusMessages = [];
+                return d;
+            }
+            return this.mapper.update(status, {onMissing: "skip"});
         }
         return undefined;
     }
