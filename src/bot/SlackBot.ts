@@ -354,9 +354,9 @@ export class SlackBot {
         }
     }
 
-    buildAppHomeLinkBlocks(appId: string, teamId: string) {
+    buildAppHomeLinkBlocks(appId: string, teamId: string)  {
         const link = this.buildAppHomeLink(appId, teamId);
-        const linkBlocks = this.viewBuilder.buildAppHomeLinkBlocks(appId, teamId, link);
+        const linkBlocks = [this.viewBuilder.buildSimpleContextBlock(link)];
         return linkBlocks;
     }
 

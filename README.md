@@ -6,7 +6,14 @@
   </a>
 </p>
 
-> A Slack bot to post daily standup status. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, and Parking Lot Participants
+> A Slack bot to post daily standup status. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, Parking Lot Participants, and Pull Requests for Review.
+> Users can schedule standup for a specific time, or post it immediately. They can edit their standup messages on the App's Home Tab.
+
+### Standup Modal
+![Standup Modal](img/modal.png)
+
+### Home Tab
+![Home Tab](img/home_screen.png)
 
 ## Install
 Add bot to channels where you wish to use it.

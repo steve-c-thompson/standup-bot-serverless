@@ -38,7 +38,7 @@ export class BotViewBuilder {
      *
      * @param trigger_id
      * @param pm
-     * @param userInfo
+     * @param userInfo passed in to pre-populate the user's timezone for the timepicker
      * @param blockData
      */
     public buildModalInputView(trigger_id: string, pm: PrivateMetadata, userInfo: UserInfo, blockData?: StandupViewData): ViewsOpenArguments {
@@ -331,8 +331,8 @@ export class BotViewBuilder {
     }
 
     /**
-     * Create the output to post in chat.
-     * @param: messageType
+     * Create the output blocks to post in chat.
+     *
      * @param messageType
      * @param userInfo Object that allows us access to user's image and name
      * @param yesterday
@@ -461,7 +461,7 @@ export class BotViewBuilder {
         return "<@" + id + ">";
     }
 
-    public buildSimpleContextBlock(msg: string) {
+    public buildSimpleContextBlock(msg: string): ContextBlock {
         return {
             type: "context",
             elements: [{
@@ -489,6 +489,10 @@ export class BotViewBuilder {
         return blocks;
     }
 
+    /**
+     * Create a string of parking lot items. When there are no parking lot attendees, the Attendees list will say "None".
+     * @param pItems
+     */
     public buildParkingLotDisplayItems(pItems: ParkingLotDisplayItem[]): string {
         if (pItems.length > 0) {
             let out = pItems.map(i => {
@@ -559,6 +563,15 @@ export class BotViewBuilder {
         };
     }
 
+    /**
+     * Build the contents of the Home tab by querying for all messages for the current day, and beyond for the case of scheduled messages.
+     * @param messages
+     * @param userInfo
+     * @param attendeeInfos
+     * @param channelIdNameMap
+     * @param today
+     * @param tzOffset
+     */
     buildHomeScreen(messages: StandupStatus[], userInfo: UserInfo, attendeeInfos: UserInfo[], channelIdNameMap: Map<string, string>, today: Date, tzOffset: number): HomeView {
         const blocks: KnownBlock[] = [];
         const view: HomeView = {
@@ -620,19 +633,5 @@ export class BotViewBuilder {
 
 
         return view;
-    }
-
-    buildAppHomeLinkBlocks(appId: string, teamId: string | null, linkMsg: string) : KnownBlock[] {
-        return [
-            {
-                type: "context",
-                elements: [
-                    {
-                        type: "mrkdwn",
-                        text: linkMsg
-                    }
-                ]
-            }
-        ];
     }
 }
