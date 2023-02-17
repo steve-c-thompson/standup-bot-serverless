@@ -79,6 +79,9 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
     async addStatusMessage(channelId: string, standupDate: Date, userId: string, data: StatusMessage, timezoneOffset: number): Promise<StandupStatus> {
         const status = await this.getChannelData(channelId, standupDate, userId, timezoneOffset);
         if (status) {
+            // ensure consistency
+            data.userId = userId;
+            data.channelId = channelId;
             const i = status.statusMessages.findIndex(m => m.messageId === data.messageId)
             if (i > -1) {
                 // found message, replacing
@@ -139,6 +142,11 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         data.standupDate = standupDate;
         data.userId = userId;
         data.userTimezoneOffset = timezoneOffset;
+        // ensure we keep userId and channelId in sync
+        data.statusMessages.forEach(m => {
+           m.userId = userId;
+           m.channelId = channelId;
+        });
         this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);
         return this.mapper.put(data);
@@ -157,6 +165,11 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         data.standupDate = standupDate;
         data.userId = userId;
         data.updatedAt = new Date();
+        // ensure we keep userId and channelId in sync
+        data.statusMessages.forEach(m => {
+            m.userId = userId;
+            m.channelId = channelId;
+        });
         // ensure we keep the dates aligned
         this.validateAndSetDates(data, timezoneOffset);
         this.setIdfromChannelIdAndDate(data);

@@ -14,6 +14,12 @@ export class StatusMessage {
     messageId: string;
 
     @attribute()
+    channelId: string;
+
+    @attribute()
+    userId: string;
+
+    @attribute()
     messageDate: Date;
 
     @attribute()

@@ -1,5 +1,6 @@
 import {Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
 import {
+    ChannelsInfoResponse,
     ChatPostMessageArguments,
     ChatScheduleMessageArguments,
     ChatUpdateArguments,
@@ -52,21 +53,19 @@ export class SlackBot {
      * Create a modal view to edit the message. Retrieve data for the message, format, and delegate to builder.
      *
      * @param command
-     * @param channelId
-     * @param userId
      * @param triggerId
      * @param client
      */
-    public async buildModalViewForPostUpdate(command: ChangeMessageCommand, channelId: string, userId: string, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
-        return this.loadModalViewForUpdate(channelId, userId, command.messageId!, command.postAt, triggerId, "posted", client);
+    public async buildModalViewForPostUpdate(command: ChangeMessageCommand, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
+        return this.loadModalViewForUpdate(command.channelId, command.userId, command.messageId!, command.postAt, triggerId, "posted", client);
     }
 
-    public async buildModalViewForScheduleUpdate(command: ChangeMessageCommand, channelId: string, userId: string, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
-        return this.loadModalViewForUpdate(channelId, userId, command.messageId!, command.postAt, triggerId, "scheduled", client);
+    public async buildModalViewForScheduleUpdate(command: ChangeMessageCommand, triggerId: string, client: WebClient): Promise<ViewsOpenArguments> {
+        return this.loadModalViewForUpdate(command.channelId, command.userId, command.messageId!, command.postAt, triggerId, "scheduled", client);
     }
 
     private async loadModalViewForUpdate(channelId: string, userId: string, messageId: string, postAt: number, triggerId: string, messageType: StandupStatusType, client: WebClient): Promise<ViewsOpenArguments> {
-        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${triggerId}, ${messageType}`);
+        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${messageType}`);
         const pm: PrivateMetadata = {
             channelId: channelId,
             userId: userId,
@@ -211,7 +210,9 @@ export class SlackBot {
             scheduleDateStr: viewInput.dateStr ? viewInput.dateStr : undefined,
             scheduleTimeStr: viewInput.timeStr ? viewInput.timeStr : undefined,
             messageType: messageType,
-            messageDate: new Date(viewInput.pm.messageDate!)
+            messageDate: new Date(viewInput.pm.messageDate!),
+            channelId: viewInput.pm.channelId!,
+            userId: viewInput.pm.userId!,
         });
     }
 
@@ -358,22 +359,20 @@ export class SlackBot {
      * Delete the message based on its ID, which is sent in the command. Return an ephemeral message.
      *
      * @param command
-     * @param channelId
-     * @param userId
      * @param client
      * @param logger
      */
-    public async deleteScheduledMessage(command: ChangeMessageCommand, channelId: string, userId: string, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments | ChatPostMessageArguments> {
+    public async deleteScheduledMessage(command: ChangeMessageCommand, client: WebClient, logger: Logger): Promise<ChatPostEphemeralArguments | ChatPostMessageArguments> {
         if (command) {
             try {
-                const status = await this.statusDao.getStatusMessage(userId, command.messageId);
+                const status = await this.statusDao.getStatusMessage(command.userId, command.messageId);
                 if (status) {
-                    return await this.deleteMessageFromSlack(logger, command, userId, channelId, client);
+                    return await this.deleteMessageFromSlack(logger, command, command.userId, command.channelId, client);
                 } else {
                     logger.info(`No status found in the database for message ID ${command.messageId}`);
                     // Try and delete anyway, in case the message was removed from the DB but not Slack
                     const msg = `No status found in the database  for message ID ${command.messageId}. Attempting to delete from Slack.`;
-                    return await this.deleteMessageFromSlack(logger, command, userId, channelId, client, msg);
+                    return await this.deleteMessageFromSlack(logger, command, command.userId, command.channelId, client, msg);
                 }
             } catch (e) {
                 let errorMsg = (e as Error).message;
@@ -385,10 +384,10 @@ export class SlackBot {
             } finally {
                 // also clean up the parking lot items
                 logger.info(`Removing StandupStatus with message ID ${command.messageId}`);
-                await this.statusDao.removeStandupStatusMessageByUserIdAndMessageId(userId, command.messageId);
+                await this.statusDao.removeStandupStatusMessageByUserIdAndMessageId(command.userId, command.messageId);
             }
         }
-        return this.buildErrorMessage(channelId, userId, "Invalid delete command");
+        return this.buildErrorMessage("NO CHANNEL", "NO USER", "Invalid delete command");
     }
 
     private async deleteMessageFromSlack(logger: Logger, command: ChangeMessageCommand, userId: string, channelId: string, client: WebClient, message?: string): Promise<ChatPostEphemeralArguments | ChatPostMessageArguments> {
@@ -482,7 +481,6 @@ export class SlackBot {
      * @param client
      */
     public async updateHomeScreen(userId: string, today: Date, client: WebClient): Promise<void> {
-
         try {
             const tzOffset = await this.getUserTimezoneOffset(userId, client);
             const messages = await this.statusDao.getStandupStatusesByUserId(userId, today, tzOffset);
@@ -490,6 +488,7 @@ export class SlackBot {
             logger.debug("Messages: " + JSON.stringify(messages, null, 2));
             // delegate to view builder to build the home screen with messages and appropriate buttons
             const userInfo = await this.queryUser(userId, client);
+            // Iterate through all parking lots to get attendees
             let attendees = messages.filter(m => m.statusMessages.length > 0).flatMap(s => {
                 return s.statusMessages.filter(sm => sm.parkingLotAttendees && sm.parkingLotAttendees.length > 0).flatMap(sm => {
                     return sm.parkingLotAttendees!;
@@ -497,7 +496,12 @@ export class SlackBot {
             });
             attendees = attendees.filter(a => !!a);
             const userInfos = await this.queryUsers(attendees, client);
-            const homeScreen = this.viewBuilder.buildHomeScreen(messages, userInfo, userInfos, today, tzOffset);
+
+            // Find the names of channels
+            let channelIds = messages.map(m => m.channelId);
+            channelIds = [...new Set(channelIds)]; // remove duplicates
+            const channelIdNameMap = await this.queryChannels(channelIds, client);
+            const homeScreen = this.viewBuilder.buildHomeScreen(messages, userInfo, userInfos, channelIdNameMap, today, tzOffset);
 
             // post the home screen
             await client.views.publish({
@@ -532,4 +536,16 @@ export class SlackBot {
         return result;
     }
 
+    private async queryChannels(channelIds: string[], client: WebClient): Promise<Map<string, string>> {
+        const channelInfosProm = channelIds?.map(c => {
+            return client.conversations.info({channel: c});
+        });
+
+        const channelInfos: ChannelsInfoResponse[] = await Promise.all(channelInfosProm!);
+        const channelMap = new Map<string, string>();
+        channelInfos.forEach(c => {
+            channelMap.set(c.channel!.id!, c.channel!.name!);
+        });
+        return channelMap;
+    }
 }

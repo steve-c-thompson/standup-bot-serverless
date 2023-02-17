@@ -33,7 +33,9 @@ beforeEach(async () => {
                 scheduleDateStr: "10/20/2020",
                 scheduleTimeStr: "09:08",
                 messageId: "12345",
-                messageDate: jan1TwelvePmTz
+                messageDate: jan1TwelvePmTz,
+                userId: "Jimmy",
+                channelId: "ABC",
             },
             {
                 messageType: "posted",
@@ -45,7 +47,9 @@ beforeEach(async () => {
                 scheduleDateStr: "10/20/2020",
                 scheduleTimeStr: "09:08",
                 messageId: "abcdef",
-                messageDate: jan1TwelvePmTz
+                messageDate: jan1TwelvePmTz,
+                userId: "Jimmy",
+                channelId: "ABC",
             }],
         timeToLive: jan2Zero,
     });
@@ -67,7 +71,9 @@ beforeEach(async () => {
                 scheduleDateStr: "10/20/2020",
                 scheduleTimeStr: "09:08",
                 messageId: "234567",
-                messageDate: jan1TwelvePmTz
+                messageDate: jan1TwelvePmTz,
+                userId: "Jimmy",
+                channelId: "DEF",
             }],
         timeToLive: jan2Zero,
     });
@@ -88,7 +94,9 @@ beforeEach(async () => {
                 scheduleDateStr: "10/20/2020",
                 scheduleTimeStr: "09:08",
                 messageId: "99999",
-                messageDate: jan1ElevenPmTz
+                messageDate: jan1ElevenPmTz,
+                userId: "Dave",
+                channelId: "ABC",
             }
         ],
         timeToLive: jan2Zero
@@ -126,6 +134,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
                     scheduleDateStr: "10/20/2020",
                     scheduleTimeStr: "09:08",
                     messageId: "12345",
+                    channelId: "ABC",
+                    userId: "Jimmy",
                     messageDate: jan1TwelvePmTz
                 }),
                 expect.objectContaining({
@@ -273,13 +283,15 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(status.statusMessages).toHaveLength(3);
             expect(status.statusMessages).toEqual(expect.arrayContaining([
                 expect.objectContaining({
-                    messageId: "12345",
+                    messageId: "12345"
                 }),
                 expect.objectContaining({
                     messageId: "abcdef",
                 }),
                 expect.objectContaining({
                     messageId: "FFFF",
+                    userId: "Jimmy",
+                    channelId: "ABC",
                 })]));
         });
         it("in place of existing status message", async () => {
@@ -404,6 +416,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
                     scheduleTimeStr: "09:08",
                     messageId: "12345",
                     messageDate: jan1TwelvePmTz,
+                    userId: "Jimmy",
+                    channelId: "ABC",
                 }],
                 timeToLive: expectedTtl,
             });
@@ -425,6 +439,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.statusMessages[0].scheduleTimeStr).toEqual("09:08");
             expect(saved.statusMessages[0].messageId).toEqual("12345");
             expect(saved.statusMessages[0].messageDate).toEqual(jan1TwelvePmTz);
+            expect(saved.statusMessages[0].userId).toEqual("Jimmy");
+            expect(saved.statusMessages[0].channelId).toEqual("ABC");
         });
         it("an entity with timezone where utc date is different from local date", async () => {
             const standupDate = new Date("2021-10-20T18:00:00.000-07:00"); // 6PM
@@ -444,6 +460,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
                     scheduleTimeStr: "18:00",
                     messageId: "12345",
                     messageDate: jan1TwelvePmTz,
+                    userId: "Jimmy",
+                    channelId: "ABC",   // incorrect channel id to be overwritten
                 }],
                 timeToLive: expectedTtl,
                 userTimezoneOffset: tzOffset,
@@ -466,6 +484,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.statusMessages[0].scheduleTimeStr).toEqual("18:00");
             expect(saved.statusMessages[0].messageId).toEqual("12345");
             expect(saved.statusMessages[0].messageDate).toEqual(jan1TwelvePmTz);
+            expect(saved.statusMessages[0].userId).toEqual("Jimmy");
+            expect(saved.statusMessages[0].channelId).toEqual("DDD");
         });
         it("an entity with timezone where utc date midnight (next day) is different from local date", async () => {
             const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
@@ -485,6 +505,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
                     scheduleTimeStr: "17:00",
                     messageId: "12345",
                     messageDate: jan1TwelvePmTz,
+                    userId: "Jimmy",
+                    channelId: "DDD",
                 }],
                 timeToLive: expectedTtl,
                 userTimezoneOffset: tzOffset,
@@ -511,7 +533,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
     });
 
     describe("should update", () => {
-        it("an existing entity", async () => {
+        it("an existing entity, keeping channelId and userId in statusMessage aligned", async () => {
             const standupDate = new Date("2021-10-20T12:00:00.000-07:00"); // 12PM
             const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
             const expectedTtl = new Date(zeroDateToday.getTime());
@@ -528,7 +550,9 @@ describe(DynamoDbStandupStatusDao.name, () => {
                         scheduleDateStr: "10/20/2021",
                         scheduleTimeStr: "12:00",
                         messageId: "123456",
-                        messageDate: jan1TwelvePmTz
+                        messageDate: jan1TwelvePmTz,
+                        userId: "XXX",
+                        channelId: "YYY",
                     }
                 ],
                 timeToLive: expectedTtl,
@@ -550,6 +574,8 @@ describe(DynamoDbStandupStatusDao.name, () => {
             expect(saved.statusMessages[0].scheduleDateStr).toEqual("10/20/2021");
             expect(saved.statusMessages[0].scheduleTimeStr).toEqual("12:00");
             expect(saved.statusMessages[0].messageId).toEqual("123456");
+            expect(saved.statusMessages[0].userId).toEqual("Jimmy");
+            expect(saved.statusMessages[0].channelId).toEqual("ABC");
         });
         it("an existing entity with timezone where utc date midnight (next day) is different from local date", async () => {
             const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
@@ -567,7 +593,9 @@ describe(DynamoDbStandupStatusDao.name, () => {
                     scheduleDateStr: "10/20/2021",
                     scheduleTimeStr: "17:00",
                     messageId: "123456",
-                    messageDate: jan1TwelvePmTz
+                    messageDate: jan1TwelvePmTz,
+                    userId: "Jimmy",
+                    channelId: "ABC",
                 }],
                 timeToLive: expectedTtl,
                 userTimezoneOffset: tzOffset,

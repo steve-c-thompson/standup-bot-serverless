@@ -22,6 +22,8 @@ let awsLambdaReceiver: AwsLambdaReceiver;
 
 const logLevel = LogLevel.INFO;
 
+const blockId = new RegExp("change-msg-.*");
+
 /**
  * This is a slack bot that allows users to enter their standup status.
  *
@@ -127,7 +129,7 @@ const init = async () => {
             const msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
                 "`@Standup`."
             const viewArgs = slackBot.buildErrorView(msg);
-            // logger.info(viewArgs);
+
             await ack({
                     response_action: "update",
                     view: viewArgs
@@ -147,9 +149,9 @@ const init = async () => {
             // must be deleted and posted to channel
             if (viewInput.pm.messageType === "scheduled" && isEdit) {
                 // If this is an edit schedule message, delete the existing one
-                let command = new ChangeMessageCommand(viewInput.pm.messageId!,
+                let command = new ChangeMessageCommand(viewInput.pm.messageId!, channelId, userId,
                     viewInput.pm.messageDate!);
-                const result = await slackBot.deleteScheduledMessage(command, channelId, userId, client, logger);
+                const result = await slackBot.deleteScheduledMessage(command, client, logger);
                 // Post the result as an ephemeral message.
                 await slackBot.messageWithSlackApi(userId, today, client, "chat.postEphemeral",
                     result as ChatPostEphemeralArguments, true);
@@ -183,7 +185,7 @@ const init = async () => {
                 const msgId = scheduleResponse.scheduled_message_id!;
                 const respChannelId = scheduleResponse.channel!;
                 // Response userID is bot ID, get this data from PrivateMetadata
-                let command = new ChangeMessageCommand(msgId,
+                let command = new ChangeMessageCommand(msgId, channelId, userId,
                     viewInput.scheduleDateTime);
                 command.messageId = msgId;
                 let confMessage = slackBot.buildScheduledMessageDialog(command, respChannelId, userId,
@@ -204,7 +206,7 @@ const init = async () => {
                         // set the timezone for saving
                         const tz = await slackBot.getUserTimezoneOffset(userId, client);
                         viewInput.pm.messageId = result.ts;
-                        await slackBot.saveStatusData(viewInput, saveDate, "scheduled", tz);
+                        await slackBot.saveStatusData(viewInput, saveDate, "posted", tz);
                     } catch (e) {
                         logger.error("Error editing posted message ", e);
                     }
@@ -218,7 +220,7 @@ const init = async () => {
                         await slackBot.messageWithSlackApi(userId, today, client, "chat.postEphemeral", msg, true);
                     }
                 }
-                // Not editing an existing posted message, but does one exist
+                // Not editing an existing posted message
                 else {
                     viewInput.pm.messageType = "posted";
                     const chatMessageArgs = await slackBot.createChatMessage(viewInput, client);
@@ -233,7 +235,7 @@ const init = async () => {
                     } catch (e) {
                         logger.error(e);
                     }
-                    const cmd = new ChangeMessageCommand(result.message?.ts!, standupDate.getTime());
+                    const cmd = new ChangeMessageCommand(result.message?.ts!, channelId, userId, standupDate.getTime());
                     const edit = slackBot.buildChatMessageEditDialog(cmd, result.channel!, userId);
                     await slackBot.messageWithSlackApi(userId, new Date(), client, "chat.postEphemeral", edit, true);
                 }
@@ -243,9 +245,9 @@ const init = async () => {
             let msg = (error as Error).message;
             const viewArgs = slackBot.buildErrorMessage(viewInput.pm.channelId!, viewInput.pm.userId!, msg) as ChatPostEphemeralArguments;
             try {
-                logger.info(viewArgs);
                 await slackBot.messageWithSlackApi(viewInput.pm.userId!, new Date(), client, "chat.postEphemeral", viewArgs);
             } catch (e) {
+                logger.error(viewArgs);
                 logger.error("Secondary error", e);
             }
         }
@@ -254,11 +256,9 @@ const init = async () => {
     /**
      * Handle the action of a button press from the change-msg block in the posted message.
      */
-    app.action({block_id: "change-msg"}, async ({body, ack, logger, client}) => {
-            logger.info("Action received: ", JSON.stringify(body, null, 2));
+    app.action({block_id: blockId}, async ({body, ack, logger, client}) => {
+            // logger.info("Action received: ", JSON.stringify(body, null, 2));
             try {
-                const channelId = (body as BlockAction).channel?.id!;
-                const userId = (body as BlockAction).user.id;
                 await ack();
                 const action = (body as BlockAction)["actions"][0];
                 let result;
@@ -267,22 +267,22 @@ const init = async () => {
                 switch (action.action_id) {
                     case ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE"):
                         cmd = ChangeMessageCommand.buildFromString(msgVal);
-                        result = await slackBot.deleteScheduledMessage(cmd!, channelId, userId, client, logger);
-                        await slackBot.messageWithSlackApi(userId, new Date(), client, "chat.postEphemeral", result as ChatPostEphemeralArguments, true);
+                        result = await slackBot.deleteScheduledMessage(cmd!, client, logger);
+                        await slackBot.messageWithSlackApi(cmd!.userId, new Date(), client, "chat.postEphemeral", result as ChatPostEphemeralArguments, true);
                         break;
                     case ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE"):
                         logger.info("Edit Request for scheduled message " + msgVal);
                         cmd = ChangeMessageCommand.buildFromString(msgVal);
                         triggerId = (body as BlockAction).trigger_id;
-                        result = await slackBot.buildModalViewForScheduleUpdate(cmd!, channelId, userId, triggerId, client);
-                        await slackBot.messageWithSlackApi((body as BlockAction).user.id, new Date(), client, "views.open", result);
+                        result = await slackBot.buildModalViewForScheduleUpdate(cmd!, triggerId, client);
+                        await slackBot.messageWithSlackApi(cmd!.userId, new Date(), client, "views.open", result);
                         break;
                     case ACTION_NAMES.get("EDIT_MESSAGE"):
                         logger.info("Edit Request for posted message " + msgVal);
                         cmd = ChangeMessageCommand.buildFromString(msgVal);
                         triggerId = (body as BlockAction).trigger_id;
-                        result = await slackBot.buildModalViewForPostUpdate(cmd!, channelId, userId, triggerId, client);
-                        await slackBot.messageWithSlackApi(userId, new Date(), client, "views.open", result);
+                        result = await slackBot.buildModalViewForPostUpdate(cmd!, triggerId, client);
+                        await slackBot.messageWithSlackApi(cmd!.userId, new Date(), client, "views.open", result);
                         break;
                 }
             } catch (e) {
