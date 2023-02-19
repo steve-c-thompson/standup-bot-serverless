@@ -1,19 +1,25 @@
 import * as AWS from "aws-sdk";
-import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-import winston, {createLogger} from "winston";
 import {DynamoDB} from "aws-sdk";
+import {LambdaClient} from "@aws-sdk/client-lambda";
+import {SecretsManager} from "@aws-sdk/client-secrets-manager";
+// import winston, {createLogger, Logger} from "winston";
+import {AwsSecretsDataSource} from "../secrets/AwsSecretsDataSource";
+import {LogLevel} from "@slack/bolt";
+import {ConsoleLogger} from "@slack/logger";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
 export const standupStatusTableName = "STANDUP_STATUS";
 export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
-export const logger = createLogger( {
-    level: 'info',
-    format: winston.format.simple(),
-    transports: [
-        new winston.transports.Console()
-    ]
-});
+// export const logger = createLogger( {
+//     level: 'info',
+//     format: winston.format.simple(),
+//     transports: [
+//         new winston.transports.Console()
+//     ]
+// });
+
+export const logger = new ConsoleLogger()
 
 export const context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
@@ -22,6 +28,7 @@ export interface Context {
     secretName: SecretName;
     dynamoDbClient: DynamoDB;
     tableNamePrefix: DynamoTableNamePrefix
+    lambdaClient: LambdaClient;
 }
 
 function createContext(): Context {
@@ -30,7 +37,8 @@ function createContext(): Context {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
-        tableNamePrefix: "prod_"
+        tableNamePrefix: "prod_",
+        lambdaClient: new LambdaClient({})
     };
 }
 
@@ -40,7 +48,8 @@ function createDevContext(): Context {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
-        tableNamePrefix: "dev_"
+        tableNamePrefix: "dev_",
+        lambdaClient: new LambdaClient({})
     };
 }
 
@@ -80,7 +89,16 @@ function createLocalContext(): Context {
             },
             region: AWS.config.region,
         }),
-        tableNamePrefix: "local_"
+        tableNamePrefix: "local_",
+        lambdaClient: new LambdaClient({
+            endpoint: "http://localhost:3002",
+            credentials: {
+                accessKeyId: AWS.config.credentials?.accessKeyId!,
+                secretAccessKey: AWS.config.credentials?.secretAccessKey!
+            },
+            logger: console,
+            region: AWS.config.region,
+        })
     };
 }
 
@@ -108,3 +126,6 @@ export async function getSecretValue(sm: SecretsManager, secretName : string) {
     }
     return undefined;
 }
+
+export const dataSource = new AwsSecretsDataSource(context.secretsManager);
+export const blockId = new RegExp("change-msg-.*");
