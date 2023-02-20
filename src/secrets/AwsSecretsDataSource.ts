@@ -1,6 +1,6 @@
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
 import {SlackSecret, SecretDataSource} from "./SecretDataSource";
-import {context, getSecretValue, logger} from "../utils/context";
+import {appContext, getSecretValue, logger} from "../utils/appContext";
 
 export class AwsSecretsDataSource implements SecretDataSource{
     secretsManager: SecretsManager;
@@ -9,9 +9,9 @@ export class AwsSecretsDataSource implements SecretDataSource{
     }
 
     async buildSecretPromise(secretToken: string) : Promise<string> {
-        // logger.debug("Fetching secretToken " + secretToken + " from secret named " + context.secretName);
+        // logger.debug("Fetching secretToken " + secretToken + " from secret named " + appContext.secretName);
         return new Promise((resolve, reject) => {
-            let sp = getSecretValue(this.secretsManager, context.secretName);
+            let sp = getSecretValue(this.secretsManager, appContext.secretName);
             sp.then((sec) => {
                 if(sec) {
                     // Ugly casting to get the secret into correct format

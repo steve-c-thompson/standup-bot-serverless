@@ -1,5 +1,5 @@
 import {DynamoDbStandupStatusDao} from "./DynamoDbStandupStatusDao";
-import {context} from "../utils/context";
+import {appContext} from "../utils/appContext";
 import {createStandupStatus, jan1, jan2} from "../test/scripts/create-dynamodb";
 import {DataMapper} from "@aws/dynamodb-data-mapper";
 import {StandupStatus, StatusMessage} from "./StandupStatus";
@@ -15,7 +15,7 @@ const jan1ElevenPmTz = new Date(jan2Zero.getTime() + 6 * 60 * 60 * 1000);
 
 beforeEach(async () => {
     await createStandupStatus();
-    const mapper = new DataMapper({client: context.dynamoDbClient, tableNamePrefix: context.tableNamePrefix});
+    const mapper = new DataMapper({client: appContext.dynamoDbClient, tableNamePrefix: appContext.tableNamePrefix});
     const statusJimmy: StandupStatus = new StandupStatus({
         id: "ABC#" + jan1Zero.getTime(),
         channelId: "ABC",
@@ -112,7 +112,7 @@ afterAll(async () => {
 });
 
 describe(DynamoDbStandupStatusDao.name, () => {
-    const dao = new DynamoDbStandupStatusDao(context.dynamoDbClient);
+    const dao = new DynamoDbStandupStatusDao(appContext.dynamoDbClient);
 
     describe("should retrieve", () => {
         it("an existing entity for a user", async () => {

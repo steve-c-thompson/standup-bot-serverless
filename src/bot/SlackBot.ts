@@ -16,7 +16,7 @@ import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
-import {logger} from "../utils/context";
+import {logger} from "../utils/appContext";
 import {StandupStatusDao} from "../data/StandupStatusDao";
 import {StandupStatusType, StatusMessage} from "../data/StandupStatus";
 

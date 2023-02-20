@@ -2,26 +2,18 @@ import * as AWS from "aws-sdk";
 import {DynamoDB} from "aws-sdk";
 import {LambdaClient} from "@aws-sdk/client-lambda";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-// import winston, {createLogger, Logger} from "winston";
 import {AwsSecretsDataSource} from "../secrets/AwsSecretsDataSource";
-import {LogLevel} from "@slack/bolt";
 import {ConsoleLogger} from "@slack/logger";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
 export const standupStatusTableName = "STANDUP_STATUS";
 export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
-// export const logger = createLogger( {
-//     level: 'info',
-//     format: winston.format.simple(),
-//     transports: [
-//         new winston.transports.Console()
-//     ]
-// });
+export const workerLambdaName = `slack-standup-${process.env.stage}-worker`; // This is from serverless.yml
 
 export const logger = new ConsoleLogger()
 
-export const context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
+export const appContext = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
 export interface Context {
     secretsManager : SecretsManager;
@@ -32,7 +24,7 @@ export interface Context {
 }
 
 function createContext(): Context {
-    logger.info("Creating context for prod");
+    logger.info("Creating appContext for prod");
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
@@ -43,7 +35,7 @@ function createContext(): Context {
 }
 
 function createDevContext(): Context {
-    logger.info("Creating context for dev");
+    logger.info("Creating appContext for dev");
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
@@ -62,7 +54,7 @@ function isDev(): boolean {
 }
 
 function createLocalContext(): Context {
-    logger.info("Creating context for local");
+    logger.info("Creating appContext for local");
     AWS.config.update({
         accessKeyId: "not-a-real-access-key-id",
         secretAccessKey: "not-a-real-access-key",
@@ -96,7 +88,7 @@ function createLocalContext(): Context {
                 accessKeyId: AWS.config.credentials?.accessKeyId!,
                 secretAccessKey: AWS.config.credentials?.secretAccessKey!
             },
-            logger: console,
+            // logger: console,
             region: AWS.config.region,
         })
     };
@@ -127,5 +119,5 @@ export async function getSecretValue(sm: SecretsManager, secretName : string) {
     return undefined;
 }
 
-export const dataSource = new AwsSecretsDataSource(context.secretsManager);
+export const dataSource = new AwsSecretsDataSource(appContext.secretsManager);
 export const blockId = new RegExp("change-msg-.*");

@@ -1,7 +1,5 @@
-import {App, AwsLambdaReceiver, BlockAction, ButtonAction, ExpressReceiver, LogLevel} from '@slack/bolt';
-import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
-import {blockId, context, dataSource, logger} from "./utils/context";
-import {APIGatewayProxyEvent} from "aws-lambda";
+import {App, BlockAction, ButtonAction, ExpressReceiver, LogLevel} from '@slack/bolt';
+import {appContext, blockId, dataSource, logger} from "./utils/appContext";
 import {SlackBot} from "./bot/SlackBot";
 import {
     ChatPostMessageResponse,
@@ -26,13 +24,14 @@ const logLevel = LogLevel.INFO;
 
 /**
  * This is a worker lambda to handle long-running functions. Its purpose is to
- * receive invocations from the another bot handler lambda and then do the work.
+ * receive invocations from the another bot handler lambda and then do the work,
+ * because sometimes that work takes longer than 3 seconds.
  */
 const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
     const slackBotToken = await dataSource.slackToken();
 
-    const statusDao = new DynamoDbStandupStatusDao(context.dynamoDbClient);
+    const statusDao = new DynamoDbStandupStatusDao(appContext.dynamoDbClient);
     const slackBot: SlackBot = new SlackBot(statusDao);
 
     // Receiver provided by the @slack/bolt framework
@@ -41,24 +40,36 @@ const init = async () => {
         logLevel: logLevel,
         endpoints: {events: "/worker/events"},
         logger: logger,
-        signatureVerification: false,
-        // processBeforeResponse: true,
+        processBeforeResponse: true,
+        signatureVerification: true    // Default, leaving here for clarity
     });
     app = new App({
         token: slackBotToken,
         receiver: workerReceiver,
         logLevel: logLevel,
         logger: logger,
-        // developerMode: true,
-        // socketMode: false,
-        signatureVerification: false,
-        // processBeforeResponse: true
+        processBeforeResponse: true,
     });
 
+    /**
+     * Main handler for view submissions. It first checks if the bot is in the channel, returning an error if not. It
+     * then acknowledges the request.
+     *
+     * Much of the functionality relies on `PrivateMetaData.messageType` to determine what output to create,
+     * as well as data received in the submission. Data is crucial because it identifies the message to update or delete.
+     *
+     * If a messageId comes in from the metadata, assume this is a status we must update (posted) or delete and update (scheduled).
+     *
+     * If there is no messageId, create new statuses.
+     *
+     * A scheduled status may be edited or deleted; both actions delete the scheduled message. The message can then be
+     * rescheduled or posted directly to the channel.
+     */
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
-        logger.info("WORKER RECEIVED VIEW SUBMISSION");
+        // logger.info("WORKER RECEIVED VIEW SUBMISSION");
         const viewInput = slackBot.getViewInputValues(view);
 
+        await ack();
         try {
             // When a messageId is present we are editing a message
             const isEdit: boolean = !!viewInput.pm.messageId;
@@ -175,20 +186,11 @@ const init = async () => {
         }
     });
 
-    app.use(async ({next, context, body, payload}) => {
-            console.log("app.use " + JSON.stringify(context, null, 2));
-            await next();
-
-    });
-
-    app.error(async (error) => {
-        console.error(error);
-    });
     /**
      * Handle the action of a button press from the change-msg block in the posted message.
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger}) => {
-            // logger.info("Action received: ", JSON.stringify(body, null, 2));
+            // logger.info("Worker action received: ", JSON.stringify(body, null, 2));
             await ack();
             try {
                 const action = (body as BlockAction)["actions"][0];
@@ -235,7 +237,7 @@ const initPromise = init();
 // Handle the Lambda function event
 module.exports.handler = async (event: any, context: any, callback: any) => {
     logger.info("WORKER Event received: " + JSON.stringify(event, null, 2));
-    // logger.info("WORKER context received: " + JSON.stringify(context, null, 2));
+    // logger.info("WORKER appContext received: " + JSON.stringify(appContext, null, 2));
     const handler = serverless(await initPromise);
     return handler(event, context, callback);
 }

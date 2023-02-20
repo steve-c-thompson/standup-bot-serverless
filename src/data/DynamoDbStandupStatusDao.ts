@@ -3,7 +3,7 @@ import {StandupStatusDao} from "./StandupStatusDao";
 import {createZeroUtcDate} from "../utils/datefunctions";
 import {DynamoDB} from "aws-sdk";
 import {DataMapper, QueryIterator} from "@aws/dynamodb-data-mapper";
-import {context, logger} from "../utils/context";
+import {appContext, logger} from "../utils/appContext";
 
 export class DynamoDbStandupStatusDao implements StandupStatusDao {
     private readonly client: DynamoDB;
@@ -12,7 +12,7 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
     constructor(client: DynamoDB) {
         this.client = client;
         this.mapper = new DataMapper(
-            {client: client, tableNamePrefix: context.tableNamePrefix}
+            {client: client, tableNamePrefix: appContext.tableNamePrefix}
         );
     }
 
