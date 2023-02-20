@@ -54,7 +54,9 @@ export async function lambdaForward(body: any, context:Context, secret: string, 
     replaceHeaderValue(context.headers, 'X-Slack-Signature', sig);
 
     const data = createWorkerLambdaRequest(fullPlayload, context);
+    // logger.info("LAMBDA FORWARDING to " + workerLambdaName + " with data: " + JSON.stringify(data, null, 2));
     try {
+        // logger.info(JSON.stringify(appContext.lambdaClient.config, null, 2));
         appContext.lambdaClient.send(new InvokeCommand({
             FunctionName: workerLambdaName,
             LogType: LogType.Tail,
@@ -65,7 +67,7 @@ export async function lambdaForward(body: any, context:Context, secret: string, 
                 logger.error(err);
                 return;
             }
-            // logger.info("LAMBDA RETURNED " + JSON.stringify(result, null, 2));
+            logger.info("LAMBDA RETURNED " + JSON.stringify(result, null, 2));
         });
     } catch (error) {
         logger.error("Lambda Error " + JSON.stringify(error, null, 2));
@@ -81,9 +83,6 @@ export async function lambdaForward(body: any, context:Context, secret: string, 
 function createSlackSignature(signingSecret: string,  headers: Record<string, string>, bodyString: string) {
     // const slackSignature = getHeaderValue(context.headers, 'x-slack-signature');
     const timestamp = getHeaderValue(headers,'x-slack-request-timestamp');
-    logger.info("Timestamp " + timestamp);
-    logger.info("Body " + bodyString);
-    logger.info(signingSecret);
 
     let sigBasestring = 'v0:' + timestamp + ':' + bodyString;
 

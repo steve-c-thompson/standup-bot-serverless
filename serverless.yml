@@ -35,10 +35,10 @@ resources:
             Projection:
               ProjectionType: "ALL"
             ProvisionedThroughput:
-              ReadCapacityUnits: 3
+              ReadCapacityUnits: 2
               WriteCapacityUnits: 2
         ProvisionedThroughput:
-          ReadCapacityUnits: 3
+          ReadCapacityUnits: 2
           WriteCapacityUnits: 2
         TableName: ${self:provider.stage}_STANDUP_STATUS
         TimeToLiveSpecification:
@@ -52,10 +52,18 @@ functions:
           path: slack/events
           method: post
     iamRoleStatements:
+      # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Authorizing.IAM.LambdaCreatePolicy.html
       - Effect: "Allow"
         Action:
-          - lambda:InvokeFunction
-        Resource: 'slack-standup-*'
+          - "lambda:InvokeFunction"
+        Resource:
+          Fn::Join:
+            - ':'
+            - - 'arn:aws:lambda'
+              - ${self:provider.region}
+              - Ref: 'AWS::AccountId'
+              - 'function'
+              - 'slack-standup-*'
       - Effect: "Allow"
         Action:
           - "secretsmanager:GetSecretValue"
@@ -148,6 +156,5 @@ custom:
     includeModules: true
     #      forceExclude:
     #        - aws-sdk
-    excludeFiles:
-      - src/**/*.test.js
-      - src/test/scripts/*.ts
+    excludeFiles: src/**/*.test.js
+

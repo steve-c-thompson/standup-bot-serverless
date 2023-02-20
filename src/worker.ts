@@ -237,7 +237,6 @@ const initPromise = init();
 // Handle the Lambda function event
 module.exports.handler = async (event: any, context: any, callback: any) => {
     logger.info("WORKER Event received: " + JSON.stringify(event, null, 2));
-    // logger.info("WORKER appContext received: " + JSON.stringify(appContext, null, 2));
     const handler = serverless(await initPromise);
     return handler(event, context, callback);
 }

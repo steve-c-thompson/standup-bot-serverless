@@ -30,7 +30,9 @@ function createContext(): Context {
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "prod_",
-        lambdaClient: new LambdaClient({})
+        lambdaClient: new LambdaClient({
+            logger: console
+        })
     };
 }
 
@@ -41,7 +43,9 @@ function createDevContext(): Context {
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "dev_",
-        lambdaClient: new LambdaClient({})
+        lambdaClient: new LambdaClient({
+            logger: console
+        })
     };
 }
 
