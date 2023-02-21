@@ -1,46 +1,51 @@
 import * as AWS from "aws-sdk";
-import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-import winston, {createLogger} from "winston";
 import {DynamoDB} from "aws-sdk";
+import {LambdaClient} from "@aws-sdk/client-lambda";
+import {SecretsManager} from "@aws-sdk/client-secrets-manager";
+import {AwsSecretsDataSource} from "../secrets/AwsSecretsDataSource";
+import {ConsoleLogger} from "@slack/logger";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
 export const standupStatusTableName = "STANDUP_STATUS";
 export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
-export const logger = createLogger( {
-    level: 'info',
-    format: winston.format.simple(),
-    transports: [
-        new winston.transports.Console()
-    ]
-});
+export const workerLambdaName = `slack-standup-${process.env.stage}-worker`; // This is from serverless.yml
 
-export const context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
+export const logger = new ConsoleLogger()
+
+export const appContext = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
 export interface Context {
     secretsManager : SecretsManager;
     secretName: SecretName;
     dynamoDbClient: DynamoDB;
     tableNamePrefix: DynamoTableNamePrefix
+    lambdaClient: LambdaClient;
 }
 
 function createContext(): Context {
-    logger.info("Creating context for prod");
+    logger.info("Creating appContext for prod");
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
-        tableNamePrefix: "prod_"
+        tableNamePrefix: "prod_",
+        lambdaClient: new LambdaClient({
+            // logger: console
+        })
     };
 }
 
 function createDevContext(): Context {
-    logger.info("Creating context for dev");
+    logger.info("Creating appContext for dev");
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
-        tableNamePrefix: "dev_"
+        tableNamePrefix: "dev_",
+        lambdaClient: new LambdaClient({
+            // logger: console
+        })
     };
 }
 
@@ -53,7 +58,7 @@ function isDev(): boolean {
 }
 
 function createLocalContext(): Context {
-    logger.info("Creating context for local");
+    logger.info("Creating appContext for local");
     AWS.config.update({
         accessKeyId: "not-a-real-access-key-id",
         secretAccessKey: "not-a-real-access-key",
@@ -80,7 +85,16 @@ function createLocalContext(): Context {
             },
             region: AWS.config.region,
         }),
-        tableNamePrefix: "local_"
+        tableNamePrefix: "local_",
+        lambdaClient: new LambdaClient({
+            endpoint: "http://localhost:3002",
+            credentials: {
+                accessKeyId: AWS.config.credentials?.accessKeyId!,
+                secretAccessKey: AWS.config.credentials?.secretAccessKey!
+            },
+            // logger: console,
+            region: AWS.config.region,
+        })
     };
 }
 
@@ -108,3 +122,6 @@ export async function getSecretValue(sm: SecretsManager, secretName : string) {
     }
     return undefined;
 }
+
+export const dataSource = new AwsSecretsDataSource(appContext.secretsManager);
+export const blockId = new RegExp("change-msg-.*");

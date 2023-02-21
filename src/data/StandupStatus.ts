@@ -1,5 +1,5 @@
 import {attribute, hashKey, rangeKey, table} from "@aws/dynamodb-data-mapper-annotations";
-import {standupStatusTableName} from "../utils/context";
+import {standupStatusTableName} from "../utils/appContext";
 import {embed} from "@aws/dynamodb-data-mapper";
 
 export type StandupStatusType = "posted" | "scheduled";

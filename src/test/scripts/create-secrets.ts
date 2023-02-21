@@ -4,7 +4,7 @@ import {
     ListSecretsCommand,
     UpdateSecretCommand
 } from "@aws-sdk/client-secrets-manager";
-import {context} from "../../utils/context";
+import {appContext} from "../../utils/appContext";
 import * as dotenv from 'dotenv';
 
 /**
@@ -13,11 +13,11 @@ import * as dotenv from 'dotenv';
 export async function createSecretsFromEnv() {
     // dotenv allows using the .env file
     dotenv.config();
-    const secretName = context.secretName;
+    const secretName = appContext.secretName;
 
     const secretString = `{"SLACK_STANDUP_SIGNING_SECRET": "${process.env.SLACK_STANDUP_SIGNING_SECRET}" ,"SLACK_STANDUP_BOT_TOKEN": "${process.env.SLACK_STANDUP_BOT_TOKEN}"}`;
 
-    const client = context.secretsManager;
+    const client = appContext.secretsManager;
 
     // See if secret exists
     const listSecrets = new ListSecretsCommand({});

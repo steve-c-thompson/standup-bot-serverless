@@ -18,7 +18,7 @@ import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
-import {logger} from "../utils/context";
+import {logger} from "../utils/appContext";
 import {StandupStatus, StandupStatusType} from "../data/StandupStatus";
 import {formatDateToPrintableWithTime, formatUtcDateToPrintable} from "../utils/datefunctions";
 

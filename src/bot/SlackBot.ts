@@ -16,7 +16,7 @@ import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
 import {ACTION_NAMES} from "./ViewConstants";
 import {PrivateMetadata} from "../dto/PrivateMetadata";
-import {logger} from "../utils/context";
+import {logger} from "../utils/appContext";
 import {StandupStatusDao} from "../data/StandupStatusDao";
 import {StandupStatusType, StatusMessage} from "../data/StandupStatus";
 
@@ -555,7 +555,7 @@ export class SlackBot {
         const result = await client.apiCall(method, args);
         if (updateHomeScreen) {
             try {
-                logger.debug("Updating home screen after messageWithSlackApi call");
+                logger.info("Updating home screen after messageWithSlackApi call");
                 await this.updateHomeScreen(userId, today, client);
             } catch (e) {
                 logger.error("Error updating home screen: " + e);
