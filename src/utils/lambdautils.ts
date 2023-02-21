@@ -32,31 +32,16 @@ function createPayloadString(body: string) {
     return "payload=" + body;
 }
 
-// https://github.com/slackapi/bolt-js/issues/914#issuecomment-870079306
+
+
 /**
- * Send the body of the request to the worker lambda. Functionality depends on headers from the original request,
- * set via custom middleware in the receiver.
- *
- * @param body
- * @param context
- * @param secret
+ * Send a lambda request
+ * @param data
  * @param logger
  */
-export async function lambdaForward(body: any, context:Context, secret: string, logger: Logger) {
-    // No need to reset the timestamp because the request happens so fast
-    // replaceHeaderValue(context.headers, 'X-Slack-Request-Timestamp', Math.floor(Date.now() / 1000).toString());
-
-    // Encode the body and format so that the outbound lambda request body matches the one used for the signature.
-    const fullPlayload = createPayloadString(encodeURIComponent(JSON.stringify(body)));
-
-    // re-sign the request because the paylod may have changed
-    const sig = createSlackSignature(secret, context.headers, fullPlayload);
-    replaceHeaderValue(context.headers, 'X-Slack-Signature', sig);
-
-    const data = createWorkerLambdaRequest(fullPlayload, context);
+function executeLambdaSend(data: { headers: any; path: string; resource: string; body: string; httpMethod: string }, logger: Logger) {
     // logger.info("LAMBDA FORWARDING to " + workerLambdaName + " with data: " + JSON.stringify(data, null, 2));
     try {
-        // logger.info(JSON.stringify(appContext.lambdaClient.config, null, 2));
         appContext.lambdaClient.send(new InvokeCommand({
             FunctionName: workerLambdaName,
             LogType: LogType.Tail,
@@ -67,7 +52,7 @@ export async function lambdaForward(body: any, context:Context, secret: string, 
                 logger.error(err);
                 return;
             }
-            logger.info("LAMBDA RETURNED " + JSON.stringify(result, null, 2));
+            // logger.info("LAMBDA RETURNED " + JSON.stringify(result, null, 2));
         });
     } catch (error) {
         logger.error("Lambda Error " + JSON.stringify(error, null, 2));
@@ -75,6 +60,39 @@ export async function lambdaForward(body: any, context:Context, secret: string, 
     }
 }
 
+// https://github.com/slackapi/bolt-js/issues/914#issuecomment-870079306
+/**
+ * Send the body of the request to the worker lambda. Functionality depends on headers from the original request,
+ * set via custom middleware in the receiver.
+ *
+ * @param body
+ * @param context
+ * @param secret
+ * @param logger
+ */
+export function forwardRequestToWorkerLambda(body: any, context:Context, secret: string, logger: Logger) {
+    // No need to reset the timestamp because the request happens so fast
+    // replaceHeaderValue(context.headers, 'X-Slack-Request-Timestamp', Math.floor(Date.now() / 1000).toString());
+
+    // Encode the body and format so that the outbound lambda request body matches the one used for the signature.
+    // REQUEST HANDLING WILL NOT WORK UNLESS PAYLOAD IN SIGNATURE AND REQUEST MATCH
+    const fullPlayload = createPayloadString(encodeURIComponent(JSON.stringify(body)));
+
+    // re-sign the request because the paylod may have changed
+    const sig = createSlackSignature(secret, context.headers, fullPlayload);
+    replaceHeaderValue(context.headers, 'X-Slack-Signature', sig);
+
+    const data = createWorkerLambdaRequest(fullPlayload, context);
+    executeLambdaSend(data, logger);
+}
+
+/**
+ * Send an empty request to the worker lambda. Functionality depends on headers from the original request,
+ */
+export function warmWorkerLambda() {
+    const data = createWorkerLambdaRequest("", {headers: {}});
+    executeLambdaSend(data, logger);
+}
 // https://api.slack.com/authentication/verifying-requests-from-slack#verifying-requests-from-slack-using-signing-secrets__a-recipe-for-security__how-to-make-a-request-signature-in-4-easy-steps-an-overview
 /**
  * Create a signature for a request from Slack

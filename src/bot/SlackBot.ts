@@ -555,7 +555,7 @@ export class SlackBot {
         const result = await client.apiCall(method, args);
         if (updateHomeScreen) {
             try {
-                logger.debug("Updating home screen after messageWithSlackApi call");
+                logger.info("Updating home screen after messageWithSlackApi call");
                 await this.updateHomeScreen(userId, today, client);
             } catch (e) {
                 logger.error("Error updating home screen: " + e);

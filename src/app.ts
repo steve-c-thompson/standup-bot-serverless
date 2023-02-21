@@ -6,7 +6,7 @@ import {WebClient} from "@slack/web-api";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
-import {lambdaForward} from "./utils/lambdautils";
+import {forwardRequestToWorkerLambda, warmWorkerLambda} from "./utils/lambdautils";
 
 let app: App;
 
@@ -146,7 +146,7 @@ const init = async () => {
         }
 
         // Delegate processing to a lambda
-        await lambdaForward(body, context, signingSecret, logger);
+        await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
 
         // TODO maybe update the view with a "processing" message
 
@@ -167,7 +167,7 @@ const init = async () => {
             // logger.info("Action received: ", JSON.stringify(body, null, 2));
             await ack();
 
-            await lambdaForward(body, context, signingSecret, logger);
+            await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
         }
     );
 
@@ -186,5 +186,13 @@ const initPromise = init();
 module.exports.handler = async (event: any, context: any, callback: any) => {
     const handler = await initPromise;
     // logger.info("APP EVENT RECEIVED " + JSON.stringify(event, null, 2));
+    // Look for events from serverless-plugin-warmup or AWS scheduled events
+    if(event.source === 'serverless-plugin-warmup' || event.source === 'aws.events') {
+        // Warmup event from serverless-plugin-warmup
+        // https://www.npmjs.com/package/serverless-plugin-warmup
+        return "App Lambda warmed up";
+    }
+    // Warm the worker lambda so it can accept requests, but only when an actual request is received
+    warmWorkerLambda();
     return handler(event, context, callback);
 }

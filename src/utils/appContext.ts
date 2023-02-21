@@ -31,7 +31,7 @@ function createContext(): Context {
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "prod_",
         lambdaClient: new LambdaClient({
-            logger: console
+            // logger: console
         })
     };
 }
@@ -44,7 +44,7 @@ function createDevContext(): Context {
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "dev_",
         lambdaClient: new LambdaClient({
-            logger: console
+            // logger: console
         })
     };
 }

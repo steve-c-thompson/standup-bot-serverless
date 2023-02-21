@@ -11,6 +11,59 @@ provider:
   region: ${opt:region, 'us-west-2'}
   memorySize: 256
   logRetentionInDays: 5
+  iamRoleStatements:
+    - Effect: 'Allow'
+      Action:
+        - 'lambda:InvokeFunction'
+      Resource:
+        - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${opt:stage, self:provider.stage}-*
+    # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Authorizing.IAM.LambdaCreatePolicy.html
+    - Effect: "Allow"
+      Action:
+        - "lambda:InvokeFunction"
+      Resource:
+        Fn::Join:
+          - ':'
+          - - 'arn:aws:lambda'
+            - ${self:provider.region}
+            - Ref: 'AWS::AccountId'
+            - 'function'
+            - 'slack-standup-*'
+    - Effect: "Allow"
+      Action:
+        - "secretsmanager:GetSecretValue"
+      Resource:
+        Fn::Join:
+          - ':'
+          - - 'arn:aws:secretsmanager'
+            - ${self:provider.region}
+            - Ref: 'AWS::AccountId'
+            - 'secret'
+            - 'SlackStandup-secret-*'
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        Fn::Join:
+          - ':'
+          - - 'arn:aws:dynamodb'
+            - ${self:provider.region}
+            - Ref: 'AWS::AccountId'
+            - 'table/*_STANDUP_STATUS'
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+      Resource:
+        Fn::Join:
+          - ':'
+          - - 'arn:aws:dynamodb'
+            - ${self:provider.region}
+            - Ref: 'AWS::AccountId'
+            - 'table/*_STANDUP_STATUS/index/*'
 resources:
   Resources:
     StatusDynamoDbTable:
@@ -47,109 +100,28 @@ resources:
 functions:
   slack:
     handler: src/app.handler
+    warmup:
+      default:
+        enabled: true
     events:
       - http:
           path: slack/events
           method: post
-    iamRoleStatements:
-      # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Authorizing.IAM.LambdaCreatePolicy.html
-      - Effect: "Allow"
-        Action:
-          - "lambda:InvokeFunction"
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:lambda'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'function'
-              - 'slack-standup-*'
-      - Effect: "Allow"
-        Action:
-          - "secretsmanager:GetSecretValue"
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:secretsmanager'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'secret'
-              - 'SlackStandup-secret-*'
-      - Effect: Allow
-        Action:
-          - dynamodb:Query
-          - dynamodb:GetItem
-          - dynamodb:PutItem
-          - dynamodb:UpdateItem
-          - dynamodb:DeleteItem
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:dynamodb'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_STATUS'
-      - Effect: Allow
-        Action:
-          - dynamodb:Query
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:dynamodb'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_STATUS/index/*'
   worker:
     handler: src/worker.handler
     events:
       - http:
           path: worker/events
           method: post
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "secretsmanager:GetSecretValue"
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:secretsmanager'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'secret'
-              - 'SlackStandup-secret-*'
-      - Effect: Allow
-        Action:
-          - dynamodb:Query
-          - dynamodb:GetItem
-          - dynamodb:PutItem
-          - dynamodb:UpdateItem
-          - dynamodb:DeleteItem
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:dynamodb'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_STATUS'
-      - Effect: Allow
-        Action:
-          - dynamodb:Query
-        Resource:
-          Fn::Join:
-            - ':'
-            - - 'arn:aws:dynamodb'
-              - ${self:provider.region}
-              - Ref: 'AWS::AccountId'
-              - 'table/*_STANDUP_STATUS/index/*'
 plugins:
   - serverless-webpack
-  - serverless-iam-roles-per-function
+#  - serverless-iam-roles-per-function
   - serverless-offline
   - serverless-express
+  - serverless-plugin-warmup
 package:
   excludeDevDependencies: true
   individually: true
-
 custom:
   webpack:
     webpackConfig: ./webpack.config.js
@@ -157,4 +129,11 @@ custom:
     #      forceExclude:
     #        - aws-sdk
     excludeFiles: src/**/*.test.js
-
+  warmup:
+    default:
+      enabled: true
+      role: IamRoleLambdaExecution
+      events:
+        - schedule: rate(3 minutes)
+      concurrency: 3
+      verbose: true
