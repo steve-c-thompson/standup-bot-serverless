@@ -29,5 +29,6 @@ services:
       - DOCKER_HOST=unix:///var/run/docker.sock
       - HOST_TMP_FOLDER=${TMPDIR}
     volumes:
-      - "${TMPDIR:-/tmp/localstack}:/tmp/localstack"
+      # https://github.com/localstack/localstack/issues/6398
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"

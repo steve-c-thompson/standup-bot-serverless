@@ -8,5 +8,5 @@ export interface PrivateMetadata {
     userId?: string;
     messageId?: string;
     messageDate?: number;
-    messageType: StandupStatusType
+    messageType?: StandupStatusType
 }

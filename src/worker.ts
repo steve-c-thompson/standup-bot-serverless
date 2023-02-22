@@ -200,7 +200,7 @@ const init = async () => {
                     case ACTION_NAMES.get("DELETE_SCHEDULED_MESSAGE"):
                         cmd = ChangeMessageCommand.buildFromString(msgVal);
                         result = await slackBot.deleteScheduledMessage(cmd!, client, logger);
-                        // TODO add a block to the home screen, maybe by passing a message ID and block to add to that message
+                        // TODO add a block confirming delete to the home screen, maybe by passing a message ID and block to add to that message
                         await slackBot.messageWithSlackApi(cmd!.userId, new Date(), client, "chat.postEphemeral", result as ChatPostEphemeralArguments, true);
                         break;
                     case ACTION_NAMES.get("EDIT_SCHEDULED_MESSAGE"):

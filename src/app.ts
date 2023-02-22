@@ -1,12 +1,12 @@
-import {AckFn, App, AwsLambdaReceiver, LogLevel, ViewResponseAction} from '@slack/bolt';
-import {appContext, blockId, dataSource, logger} from "./utils/appContext";
+import {App, AwsLambdaReceiver, Logger, LogLevel} from '@slack/bolt';
+import {appContext, blockId, dataSource} from "./utils/appContext";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
-import {WebClient} from "@slack/web-api";
+import {ViewsOpenArguments, WebClient} from "@slack/web-api";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
-import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
 import {delegateToWorker, warmWorkerLambda} from "./utils/lambdautils";
+import {PrivateMetadata} from "./dto/PrivateMetadata";
 
 let app: App;
 
@@ -58,13 +58,52 @@ const init = async () => {
     });
 
     /**
+     * Validate th the bot user is a member of the channel.
+     * @param client
+     * @param channelId
+     * @param botId
+     * @param userId
+     * @param trigger_id
+     * @param logger
+     *
+     * @return null if the bot is a member of the channel, otherwise a view to display an error message.
+     */
+    async function validateChannelAccess(client: WebClient, channelId: string, botId: string, userId: string, trigger_id: string, logger: Logger): Promise<ViewsOpenArguments | null> {
+        if (!await slackBot.validateBotUserInChannel(channelId, botId, client)) {
+            logger.error("Standup bot is not a member of channel " + channelId);
+            const msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
+                "`@Standup`."
+            const viewArgs = slackBot.buildErrorView(msg);
+
+            const pm: PrivateMetadata = {
+                channelId: channelId,
+                userId: userId,
+            };
+            let args: ViewsOpenArguments = {
+                trigger_id: trigger_id,
+                private_metadata: JSON.stringify(pm),
+                view: viewArgs,
+            };
+
+            return args;
+        }
+        return null;
+    }
+
+    /**
      * Handle the /standup command. This launches the modal view.
      *
      * Note: ideally we would check if the bot is in the channel, but that is not possible with the current slack api.
      */
-    app.command("/standup", async ({ack, body, client, logger, }) => {
+    app.command("/standup", async ({ack, body, client, logger, context}) => {
         await ack();
 
+        const channelAccess = await validateChannelAccess(client, body.channel_id, context.botId!, body.user_id, body.trigger_id, logger);
+
+        if(channelAccess) {
+            await client.views.open(channelAccess);
+            return;
+        }
         let args = body.text;
         const today = new Date();
 
@@ -115,39 +154,13 @@ const init = async () => {
         }
     });
 
-
-    async function validateBotUserInChannel(ack: AckFn<ViewResponseAction> | AckFn<void>, client: WebClient, botId: string, viewInput: StandupViewData): Promise<boolean> {
-        // Check if the bot is in channel. If not, update view with error
-        if (!await slackBot.validateBotUserInChannel(viewInput.pm.channelId!, botId, client)) {
-            logger.error("Standup bot is not a member of channel " + viewInput.pm.channelId);
-            const msg = ":x: Standup is not a member of this channel. Please try again after adding it. Add through *Integrations* or by mentioning it, like " +
-                "`@Standup`."
-            const viewArgs = slackBot.buildErrorView(msg);
-
-            await ack({
-                    response_action: "update",
-                    view: viewArgs
-                }
-            );
-            return false;
-        }
-        return true;
-    }
-
     /**
-     *  Validate that the bot is in channel, then delegate to a worker lambda.
+     *  ack() the request, then delegate to a worker lambda.
      */
     app.view("standup_view", async ({ack, body, view, client, logger, context}) => {
         let timer = new Timer();
         if(timerEnabled) {
             timer.startTimer();
-        }
-        const viewInput = slackBot.getViewInputValues(view);
-        const botId = body.view.bot_id;
-
-        // Check if the bot is in channel. If not, update view with error
-        if (!await validateBotUserInChannel(ack, client, botId, viewInput)) {
-            return;
         }
 
         // Delegate processing to a worker

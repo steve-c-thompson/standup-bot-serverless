@@ -180,7 +180,7 @@ export class SlackBot {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
+        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType!, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
 
         // post as the user who requested
         return {
