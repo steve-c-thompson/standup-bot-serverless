@@ -10,7 +10,7 @@ provider:
     stage: ${self:provider.stage}
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-west-2'}
-  memorySize: 256
+  memorySize: 180
   logRetentionInDays: 5
   iamRoleStatements:
     - Effect: 'Allow'
@@ -105,7 +105,7 @@ plugins:
   - serverless-webpack
   - serverless-offline
   - serverless-express
-#  - serverless-plugin-warmup
+#  - serverless-provisioned-concurrency-autoscaling
 package:
   excludeDevDependencies: true
   individually: true

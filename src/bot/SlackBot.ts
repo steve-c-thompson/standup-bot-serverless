@@ -65,7 +65,7 @@ export class SlackBot {
     }
 
     private async loadModalViewForUpdate(channelId: string, userId: string, messageId: string, postAt: number, triggerId: string, messageType: StandupStatusType, client: WebClient): Promise<ViewsOpenArguments> {
-        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${messageType}`);
+        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${messageType} triggerId: ${triggerId}`);
         const pm: PrivateMetadata = {
             channelId: channelId,
             userId: userId,
@@ -74,15 +74,13 @@ export class SlackBot {
             messageDate: postAt
         };
 
-        const trigger_id = triggerId;
-
         const status = await this.statusDao.getStatusMessage(userId, messageId);
 
         const userInfo = await this.queryUser(userId, client);
 
         let blockData = await this.loadSavedStatusMessage(status, pm);
 
-        return this.viewBuilder.buildModalInputView(trigger_id, pm, userInfo, blockData);
+        return this.viewBuilder.buildModalInputView(triggerId, pm, userInfo, blockData);
     }
 
     private async loadSavedStatusMessage(status: StatusMessage | undefined, pm: PrivateMetadata) {

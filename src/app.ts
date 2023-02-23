@@ -173,11 +173,17 @@ const init = async () => {
      * ack() the request and then forward the request to another lambda function.
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
-        // logger.info("Action received: ", JSON.stringify(body, null, 2));
-        await ack();
-
-            await delegateToWorker(body, context, signingSecret, logger);
+            // logger.info("Action received: ", JSON.stringify(body, null, 2));
+        let timer = new Timer();
+        if(timerEnabled) {
+            timer.startTimer();
         }
+        await delegateToWorker(body, context, signingSecret, logger);
+        await ack();
+        if(timerEnabled) {
+            timer.logElapsed("Acknowledge action", logger);
+        }
+    }
     );
 
     return receiver.start();
@@ -202,7 +208,6 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
         return "App Lambda warmed up";
     }
     // Warm the worker lambda so it can accept requests, but only when an actual request is received
-    // -- Let provisioned concurrency handle this
-    // warmWorkerLambda();
+    await warmWorkerLambda();
     return handler(event, context, callback);
 }
