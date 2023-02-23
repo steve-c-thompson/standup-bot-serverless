@@ -637,6 +637,7 @@ export class BotViewBuilder {
             blocks.push(...standupStatuses as (KnownBlock)[]);
         } catch (e) {
             logger.error("Error building home screen", e);
+            throw e;
         }
 
 

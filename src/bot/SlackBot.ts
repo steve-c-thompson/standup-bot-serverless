@@ -227,7 +227,8 @@ export class SlackBot {
         try {
             await this.statusDao.addStatusMessage(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, statusMsg, tz);
         } catch (e) {
-            logger.error(e);
+            logger.error(e)
+            throw e;
         }
     }
 
@@ -537,6 +538,7 @@ export class SlackBot {
             });
         } catch (e) {
             logger.error("Error updating home screen: " + e);
+            throw e;
         }
     }
 
@@ -554,10 +556,11 @@ export class SlackBot {
         const result = await client.apiCall(method, args);
         if (updateHomeScreen) {
             try {
-                logger.info("Updating home screen after messageWithSlackApi call");
+                logger.debug("Updating home screen after messageWithSlackApi call");
                 await this.updateHomeScreen(userId, today, client);
             } catch (e) {
                 logger.error("Error updating home screen: " + e);
+                throw e;
             }
         }
         return result;

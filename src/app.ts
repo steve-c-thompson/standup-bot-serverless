@@ -1,22 +1,12 @@
-import {AckFn, App, AwsLambdaReceiver, BlockAction, ButtonAction, LogLevel, ViewResponseAction} from '@slack/bolt';
+import {AckFn, App, AwsLambdaReceiver, LogLevel, ViewResponseAction} from '@slack/bolt';
 import {appContext, blockId, dataSource, logger} from "./utils/appContext";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
-import {
-    ChatPostMessageResponse,
-    ChatScheduleMessageArguments,
-    ChatScheduleMessageResponse,
-    ChatUpdateArguments, ChatUpdateResponse,
-    WebClient
-} from "@slack/web-api";
+import {WebClient} from "@slack/web-api";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
 import {delegateToWorker, warmWorkerLambda} from "./utils/lambdautils";
-import {ChangeMessageCommand} from "./bot/Commands";
-import {formatDateToPrintableWithTime} from "./utils/datefunctions";
-import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {ACTION_NAMES} from "./bot/ViewConstants";
 
 let app: App;
 
@@ -116,6 +106,7 @@ const init = async () => {
                 logger.debug(result);
             } catch (error) {
                 logger.error(error);
+                throw error;
             }
         }
     });

@@ -4,13 +4,13 @@ provider:
   architecture: arm64
   lambdaHashingVersion: "20201221"
   name: aws
-  runtime: nodejs14.x
+  runtime: nodejs18.x
   environment:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
     stage: ${self:provider.stage}
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-west-2'}
-  memorySize: 180
+  memorySize: 256
   logRetentionInDays: 5
   iamRoleStatements:
     - Effect: 'Allow'
@@ -126,13 +126,13 @@ custom:
       scheduledActions:
         - name: OpenOfficeTime
           timezone: "America/Denver"
-          schedule: "cron(0 5 * * MON-FRI)"
+          schedule: "cron(0 5 ? * MON-FRI *)"
           action:
             maximum: 1
             minimum: 1
         - name: CloseOfficeTime
           timezone: "America/Denver"
-          schedule: "cron(0 18 * * MON-FRI)"
+          schedule: "cron(0 21 ? * MON-FRI *)"
           action:
             maximum: 0
             minimum: 0
