@@ -1,6 +1,7 @@
 service: slack-standup
 frameworkVersion: '3'
 provider:
+  architecture: arm64
   lambdaHashingVersion: "20201221"
   name: aws
   runtime: nodejs14.x
@@ -18,17 +19,17 @@ provider:
       Resource:
         - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${opt:stage, self:provider.stage}-*
     # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Authorizing.IAM.LambdaCreatePolicy.html
-    - Effect: "Allow"
-      Action:
-        - "lambda:InvokeFunction"
-      Resource:
-        Fn::Join:
-          - ':'
-          - - 'arn:aws:lambda'
-            - ${self:provider.region}
-            - Ref: 'AWS::AccountId'
-            - 'function'
-            - 'slack-standup-*'
+#    - Effect: "Allow"
+#      Action:
+#        - "lambda:InvokeFunction"
+#      Resource:
+#        Fn::Join:
+#          - ':'
+#          - - 'arn:aws:lambda'
+#            - ${self:provider.region}
+#            - Ref: 'AWS::AccountId'
+#            - 'function'
+#            - 'slack-standup-*'
     - Effect: "Allow"
       Action:
         - "secretsmanager:GetSecretValue"
@@ -101,7 +102,9 @@ functions:
   slack:
     handler: src/app.handler
     warmup:
-      default:
+      officeHoursWarmer:
+        enabled: true
+      outOfOfficeHoursWarmer:
         enabled: true
     events:
       - http:
@@ -109,13 +112,17 @@ functions:
           method: post
   worker:
     handler: src/worker.handler
+    warmup:
+      officeHoursWarmer:
+        enabled: true
+      outOfOfficeHoursWarmer:
+        enabled: true
     events:
       - http:
           path: worker/events
           method: post
 plugins:
   - serverless-webpack
-#  - serverless-iam-roles-per-function
   - serverless-offline
   - serverless-express
   - serverless-plugin-warmup
@@ -129,11 +136,25 @@ custom:
     #      forceExclude:
     #        - aws-sdk
     excludeFiles: src/**/*.test.js
+  # Enable warmup on all functions
   warmup:
-    default:
-      enabled: true
-      role: IamRoleLambdaExecution
+    officeHoursWarmer:
+      enabled:
+        - dev
+        - prod
       events:
-        - schedule: rate(3 minutes)
+        - schedule: cron(0/4 11-2 ? * MON-FRI *)
       concurrency: 3
       verbose: true
+      logRetentionInDays: 5
+      memorySize: 128
+      prewarm: true
+    outOfOfficeHoursWarmer:
+      enabled:
+        - prod
+      events:
+        - schedule: cron(0/6 3-10 ? * MON-FRI *)
+        - schedule: cron(0/6 * ? * SAT-SUN *)
+      concurrency: 1
+      verbose: false
+      memorySize: 128

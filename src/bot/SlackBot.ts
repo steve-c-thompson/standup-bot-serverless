@@ -301,6 +301,7 @@ export class SlackBot {
 
     /**
      * Build the edit message blocks, for sending via the chat API.
+     * @deprecated We don't use this any more to avoid having the buttons in the chat dialog.
      * @param cmd
      * @param channelId
      * @param userId

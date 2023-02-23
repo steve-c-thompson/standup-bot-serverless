@@ -6,7 +6,7 @@ import {WebClient} from "@slack/web-api";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
-import {forwardRequestToWorkerLambda, warmWorkerLambda} from "./utils/lambdautils";
+import {delegateToWorker, warmWorkerLambda} from "./utils/lambdautils";
 
 let app: App;
 
@@ -145,8 +145,8 @@ const init = async () => {
             return;
         }
 
-        // Delegate processing to a lambda
-        await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
+        // Delegate processing to a worker
+        await delegateToWorker(body, context, signingSecret, logger);
 
         // TODO maybe update the view with a "processing" message
 
@@ -167,7 +167,7 @@ const init = async () => {
             // logger.info("Action received: ", JSON.stringify(body, null, 2));
             await ack();
 
-            await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
+            await delegateToWorker(body, context, signingSecret, logger);
         }
     );
 
@@ -193,6 +193,7 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
         return "App Lambda warmed up";
     }
     // Warm the worker lambda so it can accept requests, but only when an actual request is received
-    warmWorkerLambda();
+    // Let the serverless-plugin-warmup plugin warm the worker lambda
+    // warmWorkerLambda();
     return handler(event, context, callback);
 }

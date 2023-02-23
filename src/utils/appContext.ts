@@ -117,8 +117,7 @@ export async function getSecretValue(sm: SecretsManager, secretName : string) {
         }
     }
     catch (e) {
-        console.log('Error retrieving secrets');
-        console.log(e);
+        logger.error('Error retrieving secrets', e);
     }
     return undefined;
 }

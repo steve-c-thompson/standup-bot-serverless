@@ -65,14 +65,14 @@ function executeLambdaSend(data: { headers: any; path: string; resource: string;
  * Send the body of the request to the worker lambda. Functionality depends on headers from the original request,
  * set via custom middleware in the receiver.
  *
+ *
  * @param body
  * @param context
  * @param secret
  * @param logger
  */
-export function forwardRequestToWorkerLambda(body: any, context:Context, secret: string, logger: Logger) {
-    // No need to reset the timestamp because the request happens so fast
-    // replaceHeaderValue(context.headers, 'X-Slack-Request-Timestamp', Math.floor(Date.now() / 1000).toString());
+export function delegateToWorker(body: any, context:Context, secret: string, logger: Logger) {
+    replaceHeaderValue(context.headers, 'X-Slack-Request-Timestamp', Math.floor(Date.now() / 1000).toString());
 
     // Encode the body and format so that the outbound lambda request body matches the one used for the signature.
     // REQUEST HANDLING WILL NOT WORK UNLESS PAYLOAD IN SIGNATURE AND REQUEST MATCH

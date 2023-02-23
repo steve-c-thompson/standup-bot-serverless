@@ -31,7 +31,15 @@ export class ParkingLotDisplayItem {
 export class BotViewBuilder {
 
     private SHORTCUT_STORY_URL = "https://app.shortcut.com/homebound-team/story/";
-    private storySearchRegex = new RegExp(/`(\d{5})`/, "g");
+    /**
+     * 12345 NO
+     * SC-12345 NO
+     * `sc-12345` YES
+     * `SC-12345` YES
+     * `12345` YES
+     * @private
+     */
+    private storySearchRegex = new RegExp(/`((SC-)?(\d{5}))`/, "g");
 
     /**
      * Build the primary input view using block kit.
@@ -508,7 +516,7 @@ export class BotViewBuilder {
     }
 
     public formatTextNumbersToStories(content: string) {
-        return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$1" + "|$1>");
+        return content.replace(this.storySearchRegex, "<" + this.SHORTCUT_STORY_URL + "$3" + "|$1>");
     }
 
     /**
