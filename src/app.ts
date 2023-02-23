@@ -25,9 +25,13 @@ const timerEnabled = true;
  * See the README for how to configure the bot
  *
  * async init() function is used to initialize the bot. This is called from the lambda handler, and used
- * so that we can avoid initializing the bot on every lambda invocation.
+ * so that we can avoid initializing the bot on every lambda invocation. See the following for more details:
  *
  * https://serverlessfirst.com/function-initialisation/
+ *
+ * Exceptions are bubbled up to the lambda handler so that if there is an error, the lambda will fail. For
+ * example, if retrieving the signing secret fails, the bot will not be able to verify the request, so we don't
+ * want that lambda hanging around.
  */
 const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
@@ -37,7 +41,7 @@ const init = async () => {
     const slackBot: SlackBot = new SlackBot(statusDao);
 
     // Receiver provided by the @slack/bolt framework
-    // Save the headers so that they can be extracted from context. Forwarding does not work otherwise.
+    // Save the headers so that they can be extracted from context. Forwarding to the other lambda does not work otherwise.
     receiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
         logLevel: logLevel,
