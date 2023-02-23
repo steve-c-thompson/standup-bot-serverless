@@ -89,6 +89,7 @@ resources:
 functions:
   slack:
     provisionedConcurrency: 1
+    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
     handler: src/app.handler
     events:
       - http:
@@ -96,6 +97,7 @@ functions:
           method: post
   worker:
     provisionedConcurrency: 1
+    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
     handler: src/worker.handler
     events:
       - http:
@@ -105,7 +107,7 @@ plugins:
   - serverless-webpack
   - serverless-offline
   - serverless-express
-#  - serverless-provisioned-concurrency-autoscaling
+  - serverless-provisioned-concurrency-autoscaling
 package:
   excludeDevDependencies: true
   individually: true
@@ -116,3 +118,21 @@ custom:
     #      forceExclude:
     #        - aws-sdk
     excludeFiles: src/**/*.test.js
+  lambda:
+    concurrencyAutoscaling:
+      enabled: true
+      maximum: 1
+      minimum: 1
+      scheduledActions:
+        - name: OpenOfficeTime
+          timezone: "America/Denver"
+          schedule: "cron(0 5 * * MON-FRI)"
+          action:
+            maximum: 1
+            minimum: 1
+        - name: CloseOfficeTime
+          timezone: "America/Denver"
+          schedule: "cron(0 18 * * MON-FRI)"
+          action:
+            maximum: 0
+            minimum: 0
