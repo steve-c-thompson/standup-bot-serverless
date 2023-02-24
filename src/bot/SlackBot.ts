@@ -65,7 +65,7 @@ export class SlackBot {
     }
 
     private async loadModalViewForUpdate(channelId: string, userId: string, messageId: string, postAt: number, triggerId: string, messageType: StandupStatusType, client: WebClient): Promise<ViewsOpenArguments> {
-        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${messageType}`);
+        logger.info(`Loading modal view for update: ${channelId}, ${userId}, ${messageId}, ${postAt}, ${messageType} triggerId: ${triggerId}`);
         const pm: PrivateMetadata = {
             channelId: channelId,
             userId: userId,
@@ -74,15 +74,13 @@ export class SlackBot {
             messageDate: postAt
         };
 
-        const trigger_id = triggerId;
-
         const status = await this.statusDao.getStatusMessage(userId, messageId);
 
         const userInfo = await this.queryUser(userId, client);
 
         let blockData = await this.loadSavedStatusMessage(status, pm);
 
-        return this.viewBuilder.buildModalInputView(trigger_id, pm, userInfo, blockData);
+        return this.viewBuilder.buildModalInputView(triggerId, pm, userInfo, blockData);
     }
 
     private async loadSavedStatusMessage(status: StatusMessage | undefined, pm: PrivateMetadata) {
@@ -229,7 +227,8 @@ export class SlackBot {
         try {
             await this.statusDao.addStatusMessage(viewInput.pm.channelId!, saveDate, viewInput.pm.userId!, statusMsg, tz);
         } catch (e) {
-            logger.error(e);
+            logger.error(e)
+            throw e;
         }
     }
 
@@ -301,6 +300,7 @@ export class SlackBot {
 
     /**
      * Build the edit message blocks, for sending via the chat API.
+     * @deprecated We don't use this any more to avoid having the buttons in the chat dialog.
      * @param cmd
      * @param channelId
      * @param userId
@@ -538,6 +538,7 @@ export class SlackBot {
             });
         } catch (e) {
             logger.error("Error updating home screen: " + e);
+            throw e;
         }
     }
 
@@ -555,10 +556,11 @@ export class SlackBot {
         const result = await client.apiCall(method, args);
         if (updateHomeScreen) {
             try {
-                logger.info("Updating home screen after messageWithSlackApi call");
+                logger.debug("Updating home screen after messageWithSlackApi call");
                 await this.updateHomeScreen(userId, today, client);
             } catch (e) {
                 logger.error("Error updating home screen: " + e);
+                throw e;
             }
         }
         return result;

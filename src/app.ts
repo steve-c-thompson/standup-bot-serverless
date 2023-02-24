@@ -6,7 +6,7 @@ import {WebClient} from "@slack/web-api";
 import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
-import {forwardRequestToWorkerLambda, warmWorkerLambda} from "./utils/lambdautils";
+import {delegateToWorker, warmWorkerLambda} from "./utils/lambdautils";
 
 let app: App;
 
@@ -25,9 +25,13 @@ const timerEnabled = true;
  * See the README for how to configure the bot
  *
  * async init() function is used to initialize the bot. This is called from the lambda handler, and used
- * so that we can avoid initializing the bot on every lambda invocation.
+ * so that we can avoid initializing the bot on every lambda invocation. See the following for more details:
  *
  * https://serverlessfirst.com/function-initialisation/
+ *
+ * Exceptions are bubbled up to the lambda handler so that if there is an error, the lambda will fail. For
+ * example, if retrieving the signing secret fails, the bot will not be able to verify the request, so we don't
+ * want that lambda hanging around.
  */
 const init = async () => {
     const signingSecret = await dataSource.slackSigningSecret();
@@ -37,7 +41,7 @@ const init = async () => {
     const slackBot: SlackBot = new SlackBot(statusDao);
 
     // Receiver provided by the @slack/bolt framework
-    // Save the headers so that they can be extracted from context. Forwarding does not work otherwise.
+    // Save the headers so that they can be extracted from context. Forwarding to the other lambda does not work otherwise.
     receiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
         logLevel: logLevel,
@@ -106,6 +110,7 @@ const init = async () => {
                 logger.debug(result);
             } catch (error) {
                 logger.error(error);
+                throw error;
             }
         }
     });
@@ -145,14 +150,13 @@ const init = async () => {
             return;
         }
 
-        // Delegate processing to a lambda
-        await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
+        // Delegate processing to a worker
+        await delegateToWorker(body, context, signingSecret, logger);
 
         // TODO maybe update the view with a "processing" message
 
         // ack the request
         await ack();
-
         if(timerEnabled) {
             timer.logElapsed("Acknowledge view submission", logger);
         }
@@ -165,10 +169,16 @@ const init = async () => {
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
             // logger.info("Action received: ", JSON.stringify(body, null, 2));
-            await ack();
-
-            await forwardRequestToWorkerLambda(body, context, signingSecret, logger);
+        let timer = new Timer();
+        if(timerEnabled) {
+            timer.startTimer();
         }
+        await delegateToWorker(body, context, signingSecret, logger);
+        await ack();
+        if(timerEnabled) {
+            timer.logElapsed("Acknowledge action", logger);
+        }
+    }
     );
 
     return receiver.start();
@@ -193,6 +203,6 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
         return "App Lambda warmed up";
     }
     // Warm the worker lambda so it can accept requests, but only when an actual request is received
-    warmWorkerLambda();
+    await warmWorkerLambda();
     return handler(event, context, callback);
 }

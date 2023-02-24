@@ -103,16 +103,14 @@ const init = async () => {
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
                 let scheduleResponse = await slackBot.messageWithSlackApi(userId, today, client, "chat.scheduleMessage",
                     chatMessageArgs as ChatScheduleMessageArguments, true) as ChatScheduleMessageResponse;
-                try {
-                    const saveDate = new Date(viewInput.scheduleDateTime);
-                    // Save message data for next view
-                    viewInput.pm.messageId = scheduleResponse.scheduled_message_id!;
-                    viewInput.pm.messageDate = saveDate.getTime();
-                    // timezone is assumed present with scheduleDateTime
-                    await slackBot.saveStatusData(viewInput, saveDate, "scheduled", viewInput.timezone!);
-                } catch (e) {
-                    logger.error(e);
-                }
+
+                const saveDate = new Date(viewInput.scheduleDateTime);
+                // Save message data for next view
+                viewInput.pm.messageId = scheduleResponse.scheduled_message_id!;
+                viewInput.pm.messageDate = saveDate.getTime();
+                // timezone is assumed present with scheduleDateTime
+                await slackBot.saveStatusData(viewInput, saveDate, "scheduled", viewInput.timezone!);
+
 
                 const date = new Date(scheduleResponse.post_at! * 1000);
                 // @ts-ignore
@@ -134,15 +132,13 @@ const init = async () => {
                     // Update the message using the API
                     // but wait to update the home screen
                     const result = await slackBot.messageWithSlackApi(userId, today, client, "chat.update", chatMessageArgs, false) as ChatUpdateResponse;
-                    try {
-                        const saveDate = new Date(viewInput.pm.messageDate!);
-                        // set the timezone for saving
-                        const tz = await slackBot.getUserTimezoneOffset(userId, client);
-                        viewInput.pm.messageId = result.ts;
-                        await slackBot.saveStatusData(viewInput, saveDate, "posted", tz);
-                    } catch (e) {
-                        logger.error("Error editing posted message ", e);
-                    }
+
+                    const saveDate = new Date(viewInput.pm.messageDate!);
+                    // set the timezone for saving
+                    const tz = await slackBot.getUserTimezoneOffset(userId, client);
+                    viewInput.pm.messageId = result.ts;
+                    await slackBot.saveStatusData(viewInput, saveDate, "posted", tz);
+
                     // Print the result of the attempt
                     const appHomeLinkBlocks = slackBot.buildAppHomeLinkBlocks(appId, teamId!);
                     if (result.ok) {
@@ -168,11 +164,7 @@ const init = async () => {
                     viewInput.pm.messageId = result.ts!;
                     viewInput.pm.messageDate = standupDate.getTime();
                     const tz = await slackBot.getUserTimezone(userId, client);
-                    try {
-                        await slackBot.saveStatusData(viewInput, standupDate, "posted", tz);
-                    } catch (e) {
-                        logger.error(e);
-                    }
+                    await slackBot.saveStatusData(viewInput, standupDate, "posted", tz);
 
                     const appHomeLinkBlocks = slackBot.buildAppHomeLinkBlocks(appId, teamId!);
                     // Message the user to provide a link to the home screen

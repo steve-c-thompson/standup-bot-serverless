@@ -29,10 +29,10 @@ export class AwsSecretsDataSource implements SecretDataSource{
         });
     }
 
-    slackSigningSecret() {
+    async slackSigningSecret() {
         return this.buildSecretPromise("SLACK_STANDUP_SIGNING_SECRET");
     }
-    slackToken() {
+    async slackToken() {
         return this.buildSecretPromise("SLACK_STANDUP_BOT_TOKEN");
     }
 

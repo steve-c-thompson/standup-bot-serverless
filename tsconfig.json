@@ -31,6 +31,7 @@
     ".serverless/**/*",
     ".webpack/**/*",
     "_warmup/**/*",
+    "volume/**/*",
     ".vscode/**/*",
     "*.config.js",
     "**/*.js"
