@@ -39,7 +39,75 @@ export class BotViewBuilder {
      * `12345` YES
      * @private
      */
-    private storySearchRegex = new RegExp(/`((SC-)?(\d{5}))`/, "g");
+    private storySearchRegex = new RegExp(/`((SC-)?(\d{5}))`/, "gi");
+
+    public buildProcessingView(pm: PrivateMetadata, imgUrl?: string): ModalView {
+        const view: ModalView = {
+            type: 'modal',
+            // View identifier
+            callback_id: 'standup_view',
+            clear_on_close: true,
+            // Save the channel ID, user ID, and maybe message id (ts) for subsequent interactions
+            private_metadata: JSON.stringify(pm, null, 2),
+            title: {
+                type: 'plain_text',
+                text: 'Processing...'
+            },
+            blocks: [
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: "We are processing your request... :robot_face:"
+                    }
+                }
+            ]
+        }
+        if(imgUrl) {
+            view.blocks.push(
+                {
+                    type: "image",
+                    image_url: imgUrl,
+                    alt_text: "Processing..."
+                });
+        }
+        return view;
+    }
+
+    public buildFinishedView(msg: string, pm: PrivateMetadata): ModalView {
+        return {
+            type: 'modal',
+            // View identifier
+            callback_id: 'standup_view',
+            clear_on_close: true,
+            // Save the channel ID, user ID, and maybe message id (ts) for subsequent interactions
+            private_metadata: JSON.stringify(pm, null, 2),
+            title: {
+                type: 'plain_text',
+                text: 'Processing...'
+            },
+            blocks: [
+                {
+                  type: "header",
+                    text: {
+                        type: "mrkdwn",
+                        text: "Finished :heavy_check_mark:"
+                    }
+                },
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: msg
+                    }
+                },
+            ],
+            submit: {
+                type: 'plain_text',
+                text: 'Close'
+            }
+        }
+    }
 
     /**
      * Build the primary input view using block kit.
@@ -71,7 +139,7 @@ export class BotViewBuilder {
                         elements: [
                             {
                                 type: "mrkdwn",
-                                text: "Five-digit numbers surrounded by backticks `` to display `code` can link to Shortcut stories. For example: `12345` or `SC-12345` or `sc-12345`",
+                                text: "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
                             },
                         ]
                     },
@@ -349,12 +417,12 @@ export class BotViewBuilder {
      * @param pullRequests
      * @param parkingLotAttendees UserInfo objects so we can get each user's image and name
      */
-    public buildChatMessageOutputBlocks(messageType: StandupStatusType,
-                                        userInfo: UserInfo,
-                                        yesterday: string, today: string,
-                                        parkingLotItems: string | null | undefined,
-                                        pullRequests: string | null | undefined,
-                                        parkingLotAttendees: UserInfo[]) {
+    public buildModalSubmittedChatMessageOutputBlocks(messageType: StandupStatusType,
+                                                      userInfo: UserInfo,
+                                                      yesterday: string, today: string,
+                                                      parkingLotItems: string | null | undefined,
+                                                      pullRequests: string | null | undefined,
+                                                      parkingLotAttendees: UserInfo[]) {
         logger.debug("Building chat message output blocks for " + userInfo.name + " with message type " + messageType);
         const blocks: (Block | ContextBlock | HeaderBlock | SectionBlock)[] = []
         // This set of blocks can show up many times on the homepage, so do not give blocks IDs
@@ -612,10 +680,10 @@ export class BotViewBuilder {
                     const sBlocks = [];
                     // for each status figure out which attendees are needed, and use filter to remove empty values
                     const attendees: UserInfo[] = s.parkingLotAttendees!.map(p => {
-                       return attendeeInfoMap.get(p);
+                        return attendeeInfoMap.get(p);
                     }).filter(Boolean) as UserInfo[];
 
-                    sBlocks.push(...this.buildChatMessageOutputBlocks(s.messageType, userInfo, s.yesterday, s.today, s.parkingLot, s.pullRequests, attendees));
+                    sBlocks.push(...this.buildModalSubmittedChatMessageOutputBlocks(s.messageType, userInfo, s.yesterday, s.today, s.parkingLot, s.pullRequests, attendees));
                     const cmd = new ChangeMessageCommand(s.messageId, s.channelId, s.userId, s.messageDate.getTime());
                     if (s.messageType === "posted") {
                         sBlocks.push(...this.buildChatMessageEditBlocks(cmd, "Edit Status"));

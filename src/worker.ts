@@ -97,7 +97,7 @@ const init = async () => {
                 // Schedule a new message
                 let scheduleStr = formatDateToPrintableWithTime(viewInput.scheduleDateTime, viewInput.timezone!);
 
-                const chatMessageArgs = await slackBot.createChatMessage(viewInput, client);
+                const chatMessageArgs = await slackBot.buildModalSubmittedChatMessage(viewInput, client);
                 logger.info("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
@@ -128,7 +128,7 @@ const init = async () => {
             else {
                 if (isEdit && viewInput.pm.messageType === "posted") {
                     // We are editing a posted message, so update using slack's API
-                    const chatMessageArgs = await slackBot.createChatMessage(viewInput, client) as ChatUpdateArguments;
+                    const chatMessageArgs = await slackBot.buildModalSubmittedChatMessage(viewInput, client) as ChatUpdateArguments;
                     // Update the message using the API
                     // but wait to update the home screen
                     const result = await slackBot.messageWithSlackApi(userId, today, client, "chat.update", chatMessageArgs, false) as ChatUpdateResponse;
@@ -156,7 +156,7 @@ const init = async () => {
                 // Not editing an existing posted message
                 else {
                     viewInput.pm.messageType = "posted";
-                    const chatMessageArgs = await slackBot.createChatMessage(viewInput, client);
+                    const chatMessageArgs = await slackBot.buildModalSubmittedChatMessage(viewInput, client);
                     // Don't update home screen because next message will
                     const result = await slackBot.messageWithSlackApi(userId, today, client, "chat.postMessage",
                         chatMessageArgs, false) as ChatPostMessageResponse;
@@ -183,6 +183,7 @@ const init = async () => {
                 logger.error("Secondary error", e);
             }
         }
+
     });
 
     /**

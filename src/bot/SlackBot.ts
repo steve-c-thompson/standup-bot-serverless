@@ -1,10 +1,10 @@
-import {Block, Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
+import {Block, Logger, ModalView, SlashCommand, ViewOutput, ViewUpdateResponseAction,} from "@slack/bolt";
 import {
     ChannelsInfoResponse, ChatDeleteScheduledMessageResponse,
     ChatPostMessageArguments,
     ChatScheduleMessageArguments,
     ChatUpdateArguments, KnownBlock,
-    ViewsOpenArguments,
+    ViewsOpenArguments, ViewsUpdateArguments,
     WebAPICallOptions, WebAPICallResult,
     WebClient
 } from "@slack/web-api";
@@ -100,6 +100,11 @@ export class SlackBot {
         return blockData;
     }
 
+    /**
+     * Make sure the timezone is a number. If it is a string, convert it to a number.
+     * @param timezone
+     * @private
+     */
     private ensureTimezoneOffset(timezone: string | number): number {
         if (typeof timezone === 'string') {
             return getTimezoneOffset(timezone);
@@ -112,7 +117,7 @@ export class SlackBot {
      * @param view
      */
     public getViewInputValues(view: ViewOutput): StandupViewData {
-        const pm = JSON.parse(view['private_metadata']) as PrivateMetadata;
+        const pm = this.getPrivateMetadata(view);
 
         // Yesterday
         const yesterday = view['state']['values']['yesterday'][ACTION_NAMES.get("YESTERDAY")!].value!;
@@ -160,12 +165,16 @@ export class SlackBot {
         });
     }
 
+    public getPrivateMetadata(view: ViewOutput) {
+        return JSON.parse(view['private_metadata']) as PrivateMetadata;
+    }
+
     /**
      * Create the main message to display to the user after submitting modal.
      * @param viewInput The data from the modal view
      * @param client
      */
-    public async createChatMessage(viewInput: StandupViewData, client: WebClient):
+    public async buildModalSubmittedChatMessage(viewInput: StandupViewData, client: WebClient):
         Promise<ChatPostMessageArguments | ChatScheduleMessageArguments | ChatUpdateArguments> {
 
         const channelId = viewInput.pm.channelId!;
@@ -180,7 +189,7 @@ export class SlackBot {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType!, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
+        const blocks = this.viewBuilder.buildModalSubmittedChatMessageOutputBlocks(messageType!, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
 
         // post as the user who requested
         return {
@@ -540,6 +549,18 @@ export class SlackBot {
             logger.error("Error updating home screen: " + e);
             throw e;
         }
+    }
+
+    public async buildUpdateProcessingView(viewId: string, hash: string, botId: string, pm: PrivateMetadata, client:WebClient): Promise<ViewUpdateResponseAction> {
+        // const botData = await client.bots.info({
+        //     bot: botId
+        // });
+        // const imgUrl = botData.bot?.icons?.image_72;
+        const args: ViewUpdateResponseAction = {
+            response_action: "update",
+            view: this.viewBuilder.buildProcessingView(pm)
+        }
+        return args;
     }
 
     /**

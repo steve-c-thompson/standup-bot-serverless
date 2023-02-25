@@ -166,10 +166,10 @@ const init = async () => {
         // Delegate processing to a worker
         await delegateToWorker(body, context, signingSecret, logger);
 
-        // TODO maybe update the view with a "processing" message
+        const processingAction = await slackBot.buildUpdateProcessingView(view.id, view.hash, view.bot_id, slackBot.getPrivateMetadata(view), client);
 
-        // ack the request
-        await ack();
+        // ack the request with the modal
+        await ack(processingAction);
         if(timerEnabled) {
             timer.logElapsed("Acknowledge view submission", logger);
         }
