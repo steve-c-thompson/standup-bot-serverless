@@ -76,6 +76,8 @@ export class SlackBot {
 
         const status = await this.statusDao.getStatusMessage(userId, messageId);
 
+        // Query the user so that we have the user's timezone
+        // TODO may not need this when we have saved the message's timezone offset
         const userInfo = await this.queryUser(userId, client);
 
         let blockData = await this.loadSavedStatusMessage(status, pm);
@@ -180,7 +182,7 @@ export class SlackBot {
             memberInfos = await this.queryUsers(viewInput.attendees, client);
         }
 
-        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
+        const blocks = this.viewBuilder.buildChatMessageOutputBlocks(messageType!, userInfo, viewInput.yesterday, viewInput.today, viewInput.parkingLot, viewInput.pullRequests, memberInfos);
 
         // post as the user who requested
         return {

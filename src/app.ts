@@ -153,8 +153,6 @@ const init = async () => {
         // Delegate processing to a worker
         await delegateToWorker(body, context, signingSecret, logger);
 
-        // TODO maybe update the view with a "processing" message
-
         // ack the request
         await ack();
         if(timerEnabled) {
@@ -168,7 +166,7 @@ const init = async () => {
      * ack() the request and then forward the request to another lambda function.
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
-            // logger.info("Action received: ", JSON.stringify(body, null, 2));
+        logger.info("Action received: ", JSON.stringify(body, null, 2));
         let timer = new Timer();
         if(timerEnabled) {
             timer.startTimer();

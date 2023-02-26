@@ -39,7 +39,7 @@ export class BotViewBuilder {
      * `12345` YES
      * @private
      */
-    private storySearchRegex = new RegExp(/`((SC-)?(\d{5}))`/, "g");
+    private storySearchRegex = new RegExp(/`((SC-)?(\d{5}))`/, "gi");
 
     /**
      * Build the primary input view using block kit.
@@ -71,7 +71,7 @@ export class BotViewBuilder {
                         elements: [
                             {
                                 type: "mrkdwn",
-                                text: "Five-digit numbers surrounded by backticks `` and displayed as `code` will be linked to Shortcut stories.",
+                                text: "Five-digit numbers surrounded by backticks `` to display `code` can link to Shortcut stories. For example, `12345` or `SC-12345` or `sc-12345`",
                             },
                         ]
                     },
