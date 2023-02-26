@@ -1,4 +1,4 @@
-import {AckFn, App, AwsLambdaReceiver, LogLevel, ViewResponseAction} from '@slack/bolt';
+import {AckFn, App, AwsLambdaReceiver, BlockAction, ButtonAction, LogLevel, ViewResponseAction} from '@slack/bolt';
 import {appContext, blockId, dataSource, logger} from "./utils/appContext";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {SlackBot} from "./bot/SlackBot";
@@ -7,6 +7,9 @@ import {DynamoDbStandupStatusDao} from "./data/DynamoDbStandupStatusDao";
 import {StandupViewData} from "./dto/StandupViewData";
 import {Timer} from "./utils/Timer";
 import {delegateToWorker, warmWorkerLambda} from "./utils/lambdautils";
+import {ACTION_NAMES} from "./bot/ViewConstants";
+import {ChangeMessageCommand} from "./bot/Commands";
+import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 
 let app: App;
 
@@ -153,8 +156,6 @@ const init = async () => {
         // Delegate processing to a worker
         await delegateToWorker(body, context, signingSecret, logger);
 
-        // TODO maybe update the view with a "processing" message
-
         // ack the request
         await ack();
         if(timerEnabled) {
@@ -168,7 +169,7 @@ const init = async () => {
      * ack() the request and then forward the request to another lambda function.
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
-            // logger.info("Action received: ", JSON.stringify(body, null, 2));
+        logger.info("Action received: ", JSON.stringify(body, null, 2));
         let timer = new Timer();
         if(timerEnabled) {
             timer.startTimer();

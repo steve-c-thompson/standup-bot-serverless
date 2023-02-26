@@ -36,27 +36,24 @@ function createPayloadString(body: string) {
 
 /**
  * Send a lambda request
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/clients/client-lambda/
+ *
  * @param data
  * @param logger
  */
-function executeLambdaSend(data: { headers: any; path: string; resource: string; body: string; httpMethod: string }, logger: Logger) {
+async function executeLambdaSend(data: { headers: any; path: string; resource: string; body: string; httpMethod: string }, logger: Logger) {
     // logger.info("LAMBDA FORWARDING to " + workerLambdaName + " with data: " + JSON.stringify(data, null, 2));
     try {
-        appContext.lambdaClient.send(new InvokeCommand({
+        const result = await appContext.lambdaClient.send(new InvokeCommand({
             FunctionName: workerLambdaName,
             LogType: LogType.Tail,
             InvocationType: InvocationType.Event,
             Payload: Buffer.from(JSON.stringify(data)),
-        }), (err, result) => {
-            if (err) {
-                logger.error(err);
-                return;
-            }
-            // logger.info("LAMBDA RETURNED " + JSON.stringify(result, null, 2));
-        });
+        }));
+        // logger.info("Lambda result: " + JSON.stringify(result, null, 2));
     } catch (error) {
         logger.error("Lambda Error " + JSON.stringify(error, null, 2));
-        logger.error(error);
     }
 }
 
@@ -83,7 +80,7 @@ export async function delegateToWorker(body: any, context:Context, secret: strin
     replaceHeaderValue(context.headers, 'X-Slack-Signature', sig);
 
     const data = createWorkerLambdaRequest(fullPlayload, context);
-    executeLambdaSend(data, logger);
+    await executeLambdaSend(data, logger);
 }
 
 /**
