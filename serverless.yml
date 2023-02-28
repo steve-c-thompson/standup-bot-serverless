@@ -98,17 +98,6 @@ functions:
       - http:
           path: slack/events
           method: post
-  worker:
-    provisionedConcurrency: 1
-    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
-    warmup:
-      outOfOfficeHoursWarmer:
-        enabled: true
-    handler: src/worker.handler
-    events:
-      - http:
-          path: worker/events
-          method: post
 plugins:
   - serverless-webpack
   - serverless-offline
