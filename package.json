@@ -7,9 +7,9 @@
     "build:watch": "tsc -w -p .",
     "test": "stage=local src/test/scripts/start-localstack.ts && stage=local src/test/scripts/create-dynamodb.ts && stage=local jest",
     "ngrok": "~/ngrok http 5000",
-    "serverless": "stage=local npx -c 'serverless offline --stage=local --noPrependStageInUrl --httpPort=5000'",
+    "serverless": "TZ=Etc/GMT stage=local npx -c 'serverless offline --stage=local --noPrependStageInUrl --httpPort=5000'",
     "start-localstack": "src/test/scripts/start-localstack.ts && src/test/scripts/create-secrets.ts && src/test/scripts/create-dynamodb.ts",
-    "serverless-localstack": "stage=local npm run start-localstack && npm run serverless",
+    "serverless-localstack": "TZ=Etc/GMT stage=local npm run start-localstack && npm run serverless",
     "deploy-localstack": "serverless deploy --stage=local --verbose"
   },
   "keywords": [],

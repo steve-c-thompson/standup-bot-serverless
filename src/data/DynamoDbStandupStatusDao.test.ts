@@ -402,7 +402,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             zeroDate.setMinutes(standupDate.getMinutes() + tzOffset);
             zeroDate.setUTCHours(0, 0, 0, 0);
             const expectedTtl = new Date(zeroDate.getTime());
-            expectedTtl.setDate(zeroDate.getDate() + 1);
+            expectedTtl.setDate(zeroDate.getDate() + 2);
 
             const status: StandupStatus = new StandupStatus({
                 statusMessages: [{
@@ -446,7 +446,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             const standupDate = new Date("2021-10-20T18:00:00.000-07:00"); // 6PM
             const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
             const expectedTtl = new Date(zeroDateToday.getTime());
-            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            expectedTtl.setDate(zeroDateToday.getDate() + 2);
 
             const status: StandupStatus = new StandupStatus({
                 statusMessages: [{
@@ -491,7 +491,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
             const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
             const expectedTtl = new Date(zeroDateToday.getTime());
-            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            expectedTtl.setDate(zeroDateToday.getDate() + 2);
 
             const status: StandupStatus = new StandupStatus({
                 statusMessages: [{
@@ -537,7 +537,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             const standupDate = new Date("2021-10-20T12:00:00.000-07:00"); // 12PM
             const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
             const expectedTtl = new Date(zeroDateToday.getTime());
-            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            expectedTtl.setDate(zeroDateToday.getDate() + 2);
 
             const status: StandupStatus = new StandupStatus({
                 statusMessages: [
@@ -581,7 +581,7 @@ describe(DynamoDbStandupStatusDao.name, () => {
             const standupDate = new Date("2021-10-20T17:00:00.000-07:00"); // 5PM
             const zeroDateToday = new Date("2021-10-20T00:00:00.000-00:00"); // 12AM UTC same day
             const expectedTtl = new Date(zeroDateToday.getTime());
-            expectedTtl.setDate(zeroDateToday.getDate() + 1);
+            expectedTtl.setDate(zeroDateToday.getDate() + 2);
 
             const status: StandupStatus = new StandupStatus({
                 statusMessages: [{

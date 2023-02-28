@@ -130,7 +130,7 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
     }
 
     /**
-     * Add data to database, ensuring that standupDate is UTC midnight, and TTL is 1 day past that
+     * Add data to database, ensuring that standupDate is UTC midnight, and TTL is 2 days past that
      * @param channelId
      * @param standupDate
      * @param userId
@@ -233,7 +233,7 @@ export class DynamoDbStandupStatusDao implements StandupStatusDao {
         data.standupDate = createZeroUtcDate(data.standupDate);
         logger.debug("standupDate after zeroing: " + data.standupDate);
         data.timeToLive = new Date(data.standupDate!);
-        data.timeToLive.setDate(data.standupDate!.getDate() + 1);
+        data.timeToLive.setDate(data.standupDate!.getDate() + 2);
     }
 
     /**
