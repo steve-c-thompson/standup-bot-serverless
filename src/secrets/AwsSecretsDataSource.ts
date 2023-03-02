@@ -1,6 +1,6 @@
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-import {SlackSecret, SecretDataSource} from "./SecretDataSource";
-import {appContext, getSecretValue, logger} from "../utils/appContext";
+import {SlackSecret, SecretDataSource, SecretKey} from "./SecretDataSource";
+import {appContext, logger} from "../utils/appContext";
 
 export class AwsSecretsDataSource implements SecretDataSource{
     secretsManager?: SecretsManager;
@@ -8,28 +8,24 @@ export class AwsSecretsDataSource implements SecretDataSource{
         this.secretsManager = sm;
     }
 
-    async buildSecretPromise(secretToken: string) : Promise<string> {
+    async buildSecretPromise(secretToken: SecretKey) : Promise<string> {
         logger.info("Fetching secretToken " + secretToken + " from secret named " + appContext.secretName);
         // If there is no secrets manager defined, create a new one to avoid invalid signatures
         const sm: SecretsManager = this.secretsManager ? this.secretsManager : new SecretsManager({});
 
-        return new Promise((resolve, reject) => {
-            let sp = getSecretValue(sm, appContext.secretName);
-            sp.then((sec) => {
-                if(sec) {
-                    // Ugly casting to get the secret into correct format
-                    const secCast = sec as unknown as SlackSecret;
-                    const val = secCast[secretToken as keyof SlackSecret];
-                    resolve(val);
-                }
-                else {
-                    reject(`Secret ${secretToken} not found`);
-                }
-            }).catch((reason) => {
-                logger.error(`Error fetching ${secretToken}: `, reason);
-                reject(reason);
-            });
-        });
+        const result = await sm.getSecretValue({SecretId: appContext.secretName});
+        if(result.SecretString) {
+            const secret = JSON.parse(result.SecretString) as SlackSecret;
+            const val = secret[secretToken as keyof SlackSecret];
+            if(!val) {
+                throw new Error(`Secret ${secretToken} not found`);
+            }
+            logger.info("Found secretToken " + secretToken + ", adding to cache");
+            return val;
+        }
+        else {
+            throw new Error(`Secret ${secretToken} not found`);
+        }
     }
 
     async slackSigningSecret() {

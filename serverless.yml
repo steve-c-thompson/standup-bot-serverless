@@ -91,7 +91,8 @@ functions:
     provisionedConcurrency: 1
     concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
     warmup:
-      outOfOfficeHoursWarmer:
+#      outOfOfficeHoursWarmer:
+      default:
         enabled: true
     handler: src/app.handler
     events:
@@ -133,13 +134,18 @@ custom:
             maximum: 0
             minimum: 0
   warmup:
-    outOfOfficeHoursWarmer:
+    default:
+      events:
+        # warm up the lambda no matter what to make async init complete before signature can time out in 5 mins
+        # Another more complex solution would be AWS extension layers, but layers are not well-supported in serverless
+        - schedule: rate(4 minutes)
+#    outOfOfficeHoursWarmer:
       enabled:
         - prod
-      events:
+#      events:
         # 4-11:59 UTC is 9pm - 4:59am MST
-        - schedule: cron(0/5 4-11 ? * MON-FRI *)
-        - schedule: cron(0/5 * ? * SAT-SUN *)
+#        - schedule: cron(0/5 4-11 ? * MON-FRI *)
+#        - schedule: cron(0/5 * ? * SAT-SUN *)
       concurrency: 1
       verbose: false
       memorySize: 128

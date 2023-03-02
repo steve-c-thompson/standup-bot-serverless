@@ -1,7 +1,7 @@
 #!/usr/bin/env ts-node-script
 import {
     CreateSecretCommand,
-    ListSecretsCommand, SecretsManager,
+    ListSecretsCommand,
     UpdateSecretCommand
 } from "@aws-sdk/client-secrets-manager";
 import {appContext} from "../../utils/appContext";
@@ -17,7 +17,7 @@ export async function createSecretsFromEnv() {
 
     const secretString = `{"SLACK_STANDUP_SIGNING_SECRET": "${process.env.SLACK_STANDUP_SIGNING_SECRET}" ,"SLACK_STANDUP_BOT_TOKEN": "${process.env.SLACK_STANDUP_BOT_TOKEN}"}`;
 
-    const client = appContext.secretsManager ? appContext.secretsManager : new SecretsManager({});
+    const client = appContext.secretsManager!; // If we are running this, we expect the secrets manager to be defined
 
     // See if secret exists
     const listSecrets = new ListSecretsCommand({});
