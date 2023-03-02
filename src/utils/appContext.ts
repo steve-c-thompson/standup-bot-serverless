@@ -12,7 +12,7 @@ export const logger = new ConsoleLogger()
 export const appContext: Context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
 export interface Context {
-    secretsManager? : SecretsManager;
+    secretsManager : SecretsManager;
     secretName: SecretName;
     dynamoDbClient: DynamoDB;
     tableNamePrefix: DynamoTableNamePrefix
@@ -25,6 +25,7 @@ function createContext(): Context {
     //    logger: console
     // });
     return {
+        secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "prod_",
@@ -37,6 +38,7 @@ function createDevContext(): Context {
         logger: console
     });
     return {
+        secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "dev_",

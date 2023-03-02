@@ -17,7 +17,7 @@ export async function createSecretsFromEnv() {
 
     const secretString = `{"SLACK_STANDUP_SIGNING_SECRET": "${process.env.SLACK_STANDUP_SIGNING_SECRET}" ,"SLACK_STANDUP_BOT_TOKEN": "${process.env.SLACK_STANDUP_BOT_TOKEN}"}`;
 
-    const client = appContext.secretsManager!; // If we are running this, we expect the secrets manager to be defined
+    const client = appContext.secretsManager;
 
     // See if secret exists
     const listSecrets = new ListSecretsCommand({});
