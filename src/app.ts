@@ -10,7 +10,7 @@ import {
     SlackViewAction,
     ViewResponseAction
 } from '@slack/bolt';
-import {appContext, blockId, dataSource, logger} from "./utils/appContext";
+import {appContext, blockId, logger} from "./utils/appContext";
 import {SlackBot} from "./bot/SlackBot";
 import {
     ChatPostMessageResponse,
@@ -27,14 +27,7 @@ import {ChangeMessageCommand} from "./bot/Commands";
 import {formatDateToPrintableWithTime} from "./utils/datefunctions";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {ACTION_NAMES} from "./bot/ViewConstants";
-
-let app: App;
-
-let receiver: AwsLambdaReceiver;
-
-const logLevel = LogLevel.INFO;
-
-const timerEnabled = true;
+import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
 
 /**
  * This is a slack bot that allows users to enter their standup status.
@@ -54,6 +47,17 @@ const timerEnabled = true;
  * want that lambda hanging around.
  */
 const init = async () => {
+    // logger.info("Executing async init() function");
+
+    let app: App;
+
+    let receiver: AwsLambdaReceiver;
+
+    const logLevel = LogLevel.INFO;
+
+    const timerEnabled = true;
+
+    const dataSource = new AwsSecretsDataSource(appContext.secretsManager);
     const signingSecret = await dataSource.slackSigningSecret();
     const slackBotToken = await dataSource.slackToken();
 
@@ -76,7 +80,7 @@ const init = async () => {
      *
      * Note: ideally we would check if the bot is in the channel, but that is not possible with the current slack api.
      */
-    app.command("/standup", async ({ack, body, client, logger, }) => {
+    app.command("/standup", async ({ack, body, client, logger,}) => {
         await ack();
 
         let args = body.text;
@@ -153,7 +157,7 @@ const init = async () => {
      */
     app.view("standup_view", async ({ack, body, view, client, logger, context}) => {
         let timer = new Timer();
-        if(timerEnabled) {
+        if (timerEnabled) {
             timer.startTimer();
         }
         const viewInput = slackBot.getViewInputValues(view);
@@ -165,7 +169,7 @@ const init = async () => {
         }
         // ack the request
         await ack();
-        if(timerEnabled) {
+        if (timerEnabled) {
             timer.logElapsed("Acknowledge view submission", logger);
         }
 
@@ -224,7 +228,7 @@ const init = async () => {
                 // Response userID is bot ID, get this data from PrivateMetadata
                 let command = new ChangeMessageCommand(msgId, channelId, userId,
                     viewInput.scheduleDateTime);
-                let confMessage = slackBot.buildScheduledMessageConfirmationAndLink(command, viewInput.timezone! ,appId, teamId!, chatMessageArgs.blocks!);
+                let confMessage = slackBot.buildScheduledMessageConfirmationAndLink(command, viewInput.timezone!, appId, teamId!, chatMessageArgs.blocks!);
 
                 await slackBot.messageWithSlackApi(userId, today, client, "chat.postEphemeral", confMessage, true);
             }
@@ -295,19 +299,19 @@ const init = async () => {
      * ack() the request and then forward the request to another lambda function.
      */
     app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
-        // logger.info("Action received: ", JSON.stringify(body, null, 2));
-        let timer = new Timer();
-        if(timerEnabled) {
-            timer.startTimer();
-        }
+            // logger.info("Action received: ", JSON.stringify(body, null, 2));
+            let timer = new Timer();
+            if (timerEnabled) {
+                timer.startTimer();
+            }
 
-        await ack();
-        if(timerEnabled) {
-            timer.logElapsed("Acknowledge action", logger);
-        }
+            await ack();
+            if (timerEnabled) {
+                timer.logElapsed("Acknowledge action", logger);
+            }
 
-        await handleActionSubmit(body, client, logger);
-    }
+            await handleActionSubmit(body, client, logger);
+        }
     );
 
     async function handleActionSubmit(body: SlackAction, client: WebClient, logger: Logger) {
@@ -347,7 +351,7 @@ const init = async () => {
             });
         }
     }
-
+    // logger.info("App initialized");
     return receiver.start();
 }
 // Store the init promise in module scope so that subsequent calls to init() return the resolved promise
@@ -362,6 +366,7 @@ const initPromise = init();
  * @param callback
  */
 module.exports.handler = async (event: any, context: any, callback: any) => {
+    // logger.info("App Lambda invoked");
     const handler = await initPromise;
     // logger.info("APP EVENT RECEIVED " + JSON.stringify(event, null, 2));
     // Look for events from serverless-plugin-warmup or AWS scheduled events
@@ -373,3 +378,4 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
 
     return handler(event, context, callback);
 }
+

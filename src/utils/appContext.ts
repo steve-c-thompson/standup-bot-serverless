@@ -1,7 +1,6 @@
 import * as AWS from "aws-sdk";
 import {DynamoDB} from "aws-sdk";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-import {AwsSecretsDataSource} from "../secrets/AwsSecretsDataSource";
 import {ConsoleLogger} from "@slack/logger";
 
 export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
@@ -10,10 +9,10 @@ export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
 export const logger = new ConsoleLogger()
 
-export const appContext = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
+export const appContext: Context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
 export interface Context {
-    secretsManager? : SecretsManager;
+    secretsManager : SecretsManager;
     secretName: SecretName;
     dynamoDbClient: DynamoDB;
     tableNamePrefix: DynamoTableNamePrefix
@@ -26,6 +25,7 @@ function createContext(): Context {
     //    logger: console
     // });
     return {
+        secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "prod_",
@@ -38,6 +38,7 @@ function createDevContext(): Context {
         logger: console
     });
     return {
+        secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "dev_",
@@ -83,31 +84,4 @@ function createLocalContext(): Context {
         tableNamePrefix: "local_",
     };
 }
-
-export async function getSecretValue(sm: SecretsManager, secretName : string) {
-    try {
-        const data = await sm.getSecretValue(({
-            SecretId: secretName
-        }));
-
-        if(data) {
-            if (data.SecretString) {
-                const secret = data.SecretString;
-                const parsedSecret = JSON.parse(secret);
-                return parsedSecret;
-            }
-            else {
-                let buff = new Buffer(data.SecretBinary!);
-                return buff.toString('ascii');
-            }
-        }
-    }
-    catch (e) {
-        logger.error('Error retrieving secrets', e);
-        throw e;
-    }
-    return undefined;
-}
-
-export const dataSource = new AwsSecretsDataSource(appContext.secretsManager!);
 export const blockId = new RegExp("change-msg-.*");

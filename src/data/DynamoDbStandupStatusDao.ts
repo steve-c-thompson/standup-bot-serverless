@@ -2,6 +2,7 @@ import {StandupStatus, StatusMessage} from "./StandupStatus";
 import {StandupStatusDao} from "./StandupStatusDao";
 import {createZeroUtcDate} from "../utils/datefunctions";
 import {DynamoDB} from "aws-sdk";
+
 import {DataMapper, QueryIterator} from "@aws/dynamodb-data-mapper";
 import {appContext, logger} from "../utils/appContext";
 
