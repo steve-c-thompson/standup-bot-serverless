@@ -2,7 +2,7 @@ import {
     adjustDateAndTimeForTimezone,
     createZeroUtcDate,
     formatDateToPrintableWithTime,
-    formatUtcDateToPrintable, getTimezoneOffset
+    formatUtcDateToPrintable, getTimezoneOffsetFromIANA
 } from "./datefunctions";
 
 const jan1 = new Date(2020, 0, 1, 0, 0, 0, 0);
@@ -40,7 +40,7 @@ describe('date functions', () => {
     });
     describe('getTimezoneOffset', () => {
        it('should get the timezone offset', () => {
-           const result = getTimezoneOffset('America/Denver');
+           const result = getTimezoneOffsetFromIANA('America/Denver');
            expect(result).toBe(-420);
        });
     });

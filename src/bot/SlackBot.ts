@@ -10,7 +10,7 @@ import {
 } from "@slack/web-api";
 import {BotViewBuilder, ParkingLotDisplayItem} from "./BotViewBuilder";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
-import {adjustDateAndTimeForTimezone, formatDateToPrintableWithTime, getTimezoneOffset} from "../utils/datefunctions";
+import {adjustDateAndTimeForTimezone, formatDateToPrintableWithTime, getTimezoneOffsetFromIANA} from "../utils/datefunctions";
 import {ChangeMessageCommand} from "./Commands";
 import {StandupViewData} from "../dto/StandupViewData";
 import {UserInfo} from "../dto/UserInfo";
@@ -104,7 +104,7 @@ export class SlackBot {
 
     private ensureTimezoneOffset(timezone: string | number): number {
         if (typeof timezone === 'string') {
-            return getTimezoneOffset(timezone);
+            return getTimezoneOffsetFromIANA(timezone);
         }
         return timezone;
     }
