@@ -16,6 +16,12 @@ export function formatUtcDateToPrintable(dateTime: number): string {
     return m.format("M/D/YYYY");
 }
 
+/**
+ * Adjusts a date and time for a timezone
+ * @param dateStr YYYY-MM-DD
+ * @param timeStr HH:mm
+ * @param tz timezone
+ */
 export function adjustDateAndTimeForTimezone(dateStr: string | null | undefined,
                                              timeStr: string | null | undefined,
                                              tz: string | null | undefined): number | undefined {
