@@ -1,5 +1,9 @@
-import moment from "moment-timezone";
-import {getTimezoneOffset, zonedTimeToUtc, format, formatInTimeZone, utcToZonedTime} from 'date-fns-tz'
+import dayjs from "dayjs";
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 /**
  *
@@ -9,18 +13,15 @@ import {getTimezoneOffset, zonedTimeToUtc, format, formatInTimeZone, utcToZonedT
 export function formatDateToPrintableWithTime(dateTime: number | string, timezone: number | string): string {
     let m;
     if (typeof timezone === "string") {
-        m = moment(dateTime).tz(timezone);
+        m = dayjs(dateTime).tz(timezone);
     } else {
-        m = moment(dateTime).utcOffset(timezone);
+        m = dayjs(dateTime).utcOffset(timezone);
     }
     return m.format("M/D/YYYY") + " at " + m.format("h:mm A");
 }
 
 export function formatUtcDateToPrintable(dateTime: number): string {
-    // const m = moment.utc(dateTime);
-    const date = new Date(dateTime);
-
-    return formatInTimeZone(date, "UTC", "M/d/yyyy");
+    return dayjs(dateTime).tz("UTC").format("M/D/YYYY");
 }
 
 /**
@@ -28,13 +29,14 @@ export function formatUtcDateToPrintable(dateTime: number): string {
  * @param dateStr YYYY-MM-DD
  * @param timeStr HH:mm
  * @param tz timezone
+ * @return an instant in time or undefined if all values are not passed
  */
 export function adjustDateAndTimeForTimezone(dateStr: string | null | undefined,
                                              timeStr: string | null | undefined,
                                              tz: string | null | undefined): number | undefined {
     let dateTime;
     if (dateStr && timeStr && tz) {
-        let m = zonedTimeToUtc(dateStr + "T" + timeStr + ":00", tz);
+        let m = dayjs.tz(dateStr + " " + timeStr + ":00", tz);
         dateTime = m.valueOf();
     }
     return dateTime;
@@ -47,5 +49,5 @@ export function createZeroUtcDate(date: Date): Date {
 }
 
 export function getTimezoneOffsetFromIANA(timezone: string): number {
-    return getTimezoneOffset(timezone) / 1000 / 60;
+    return dayjs().tz(timezone).utcOffset();
 }
