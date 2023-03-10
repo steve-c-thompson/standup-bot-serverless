@@ -141,7 +141,8 @@ This bot also has a **Home Tab**, which must be enabled in _App Home_.
 
 ![Home Tab](img/home_tab.png)
 
-## 
+## Known Issues
+Scheduling a message after a Daylight Savings Time boundary will say it's scheduled at the time you selected, but show a different (correct) time on the home screen. It is scheduled at the time you selected, so it's just a formatting issue when the message is scheduled.
 ## Author
 
 👤 **Steve Thompson**
