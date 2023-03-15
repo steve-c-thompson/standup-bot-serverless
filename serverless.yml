@@ -118,12 +118,18 @@ custom:
   lambda:
     concurrencyAutoscaling:
       enabled: true
-      maximum: 1
+      maximum: 2
       minimum: 1
       scheduledActions:
         - name: OpenOfficeTime
           timezone: "America/Denver"
           schedule: "cron(0 5 ? * MON-FRI *)"
+          action:
+            maximum: 2
+            minimum: 2
+        - name: PostStandupTime
+          timezone: "America/Denver"
+          schedule: "cron(0 11 ? * MON-FRI *)"
           action:
             maximum: 1
             minimum: 1
@@ -146,6 +152,6 @@ custom:
         # 4-11:59 UTC is 9pm - 4:59am MST
 #        - schedule: cron(0/5 4-11 ? * MON-FRI *)
 #        - schedule: cron(0/5 * ? * SAT-SUN *)
-      concurrency: 1
+      concurrency: 2
       verbose: false
       memorySize: 128
