@@ -1,4 +1,4 @@
-<h1 align="center">Welcome to statndup-bot</h1>
+<h1 align="center">Standup Slack App</h1>
 <p>
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue.svg?cacheSeconds=2592000" />
   <a href="#" target="_blank">
@@ -6,7 +6,7 @@
   </a>
 </p>
 
-> A Slack app to post daily standup status, for teams that wish to hold offline standups. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, Parking Lot Participants, and Pull Requests for Review.
+> This is a Slack app to post daily standup status, for teams that wish to hold offline standups. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, Parking Lot Participants, and Pull Requests for Review.
 > 
 > Users can schedule standup statuses to post at a specific time, or post immediately. They can edit their standup messages on the App's Home Tab.
 >
@@ -24,7 +24,7 @@ Details of the modal are shown below.
 | -- | -- |
 |![Standup Modal](img/interface1.png)|![Standup Modal](img/interface2.png)|
 
-> While standup posts appear to come from the user, they are actually created by the app using the user's avatar and name.
+> While standup messages appear to come from the user, they are actually created by the app, using the user's avatar and name.
 
 ## Parking Lot
 Any user can post the day's parking lot items for a channel. This will `@` all users who were tagged for parking lot discussion. 
@@ -32,7 +32,9 @@ Any user can post the day's parking lot items for a channel. This will `@` all u
 ![Parking Lot](img/post_parking_lot.gif)
 
 ## Home Tab
-Users can edit posts from the App's Home tab.
+Users can edit statuses from the App's Home tab.
+
+> The Home tab is drawn from the user's status entries in the App's database. Status entries exist in the database for one day. Upon posting a status, the Home tab is redrawn with available statues, so statuses from earlier days will no longer display.
 
 ![Home Tab](img/home.gif)
 
