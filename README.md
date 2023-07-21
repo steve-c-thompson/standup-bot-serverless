@@ -10,23 +10,32 @@
 > Users can schedule standup for a specific time, or post it immediately. They can edit their standup messages on the App's Home Tab.
 
 ## Standup Modal
-The app launches a single modal, shown below in two parts.
+The app launches a modal for data entry.
+
+![Help command and launching modal](img/help_modal.gif)
+
+Details of the modal are shown below.
 
 
 | Part 1/2 | Part 2/2 |
 | -- | -- |
 |![Standup Modal](img/interface1.png)|![Standup Modal](img/interface2.png)|
 
-## Parking Lot
-Post the day's parking lot items for the specific channel.
+> While standup posts appear to come from the user, they are actually created by the app, using the user's avatar and name.
 
-![Parking Lot](img/parkingLot.png)
+## Parking Lot
+Any user can post the day's parking lot items for a channel. This will `@` all users who were tagged for parking lot discussion. 
+
+![Parking Lot](img/post_parking_lot.gif)
 
 ## Home Tab
-![Home Tab](img/home_screen.png)
+Users can edit posts from the App's Home tab.
 
-## Install
-Add bot to channels where you wish to use it.
+![Home Tab](img/home.gif)
+
+
+## Installation
+Add the app to channels where you wish to use it.
 
 ![Slack Integration](img/slack_integration.png)
 
