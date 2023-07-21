@@ -6,8 +6,11 @@
   </a>
 </p>
 
-> A Slack app to post daily standup status. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, Parking Lot Participants, and Pull Requests for Review.
-> Users can schedule standup for a specific time, or post it immediately. They can edit their standup messages on the App's Home Tab.
+> A Slack app to post daily standup status, for teams that wish to hold offline standups. It launches a modal, prompting users for Yesterday, Today, Parking Lot Items, Parking Lot Participants, and Pull Requests for Review.
+> 
+> Users can schedule standup statuses to post at a specific time, or post immediately. They can edit their standup messages on the App's Home Tab.
+>
+> In this offline standup process, "Parking Lot" is a face-to-face meeting scheduled at a regular time, which allows a subset of team members to meet and discuss issues. Prior to this meeting, a user can post the Parking Lot items to notify team members that their presence is required.
 
 ## Standup Modal
 The app launches a modal for data entry.
@@ -21,7 +24,7 @@ Details of the modal are shown below.
 | -- | -- |
 |![Standup Modal](img/interface1.png)|![Standup Modal](img/interface2.png)|
 
-> While standup posts appear to come from the user, they are actually created by the app, using the user's avatar and name.
+> While standup posts appear to come from the user, they are actually created by the app using the user's avatar and name.
 
 ## Parking Lot
 Any user can post the day's parking lot items for a channel. This will `@` all users who were tagged for parking lot discussion. 
