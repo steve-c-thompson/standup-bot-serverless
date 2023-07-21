@@ -80,7 +80,7 @@ export class SlackBot {
         // TODO may not need this when we have saved the message's timezone offset
         const userInfo = await this.queryUser(userId, client);
 
-        let blockData = await this.loadSavedStatusMessage(status, pm);
+        const blockData = await this.loadSavedStatusMessage(status, pm);
 
         return this.viewBuilder.buildModalInputView(triggerId, pm, userInfo, blockData);
     }
@@ -245,7 +245,7 @@ export class SlackBot {
         const statuses = await this.statusDao.getChannelDataForDate(channelId, date, timezoneOffset);
 
         let displayItems: ParkingLotDisplayItem[] = [];
-        let statsWithParkingLots = statuses.filter(s => s.statusMessages.filter(m => m.parkingLot || m.parkingLotAttendees && m.parkingLotAttendees.length > 0).length > 0);
+        const statsWithParkingLots = statuses.filter(s => s.statusMessages.filter(m => m.parkingLot || m.parkingLotAttendees && m.parkingLotAttendees.length > 0).length > 0);
 
         // iterate through each status and map parkingLot with statusMessages to a display item
         class DisplayItem {
@@ -256,7 +256,7 @@ export class SlackBot {
 
         const displayItemsArr: DisplayItem[] = [];
         statsWithParkingLots.forEach(s => {
-            let sms = s.statusMessages.filter(m => m.parkingLot || m.parkingLotAttendees && m.parkingLotAttendees.length > 0);
+            const sms = s.statusMessages.filter(m => m.parkingLot || m.parkingLotAttendees && m.parkingLotAttendees.length > 0);
             sms.map(sm => {
                 displayItemsArr.push({
                     userId: s.userId,
@@ -267,7 +267,7 @@ export class SlackBot {
         });
         const proms = displayItemsArr.map(async di => {
             const userInfo = await this.queryUser(di.userId, client);
-            let item = new ParkingLotDisplayItem();
+            const item = new ParkingLotDisplayItem();
             item.userName = userInfo.name;
             item.attendeeIds = di.attendees;
             item.content = di.parkingLot;
@@ -460,7 +460,20 @@ export class SlackBot {
      * @param msg
      */
     public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments | ChatPostMessageArguments {
-        return this.viewBuilder.buildErrorMessage(channelId, userId, msg);
+        return {
+            channel: channelId,
+            user: userId,
+            blocks: [
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: msg
+                    }
+                }
+            ],
+            text: msg
+        };
     }
 
     /**
@@ -554,7 +567,7 @@ export class SlackBot {
      * @param updateHomeScreen
      */
     async messageWithSlackApi(userId: string, today: Date, client: WebClient, method: string, args: WebAPICallOptions,
-                              updateHomeScreen: boolean = false): Promise<WebAPICallResult> {
+                              updateHomeScreen = false): Promise<WebAPICallResult> {
         const result = await client.apiCall(method, args);
         if (updateHomeScreen) {
             try {

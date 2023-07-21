@@ -549,29 +549,6 @@ export class BotViewBuilder {
     }
 
     /**
-     * Build a full ephemeral message to post in the `channelId` and `userId` found on input
-     * @param channelId
-     * @param userId
-     * @param msg
-     */
-    public buildErrorMessage(channelId: string, userId: string, msg: string): ChatPostEphemeralArguments {
-        return {
-            channel: channelId,
-            user: userId,
-            blocks: [
-                {
-                    type: "section",
-                    text: {
-                        type: "mrkdwn",
-                        text: msg
-                    }
-                }
-            ],
-            text: msg
-        };
-    }
-
-    /**
      * Build the contents of the Home tab by querying for all messages for the current day, and beyond for the case of scheduled messages.
      * @param messages
      * @param userInfo

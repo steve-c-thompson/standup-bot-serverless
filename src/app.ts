@@ -47,12 +47,7 @@ import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
  * want that lambda hanging around.
  */
 const init = async () => {
-    // logger.info("Executing async init() function");
-
-    let app: App;
-
-    let receiver: AwsLambdaReceiver;
-
+    
     const logLevel = LogLevel.INFO;
 
     const timerEnabled = true;
@@ -65,11 +60,11 @@ const init = async () => {
     const slackBot: SlackBot = new SlackBot(statusDao);
 
     // Receiver provided by the @slack/bolt framework
-    receiver = new AwsLambdaReceiver({
+    const receiver = new AwsLambdaReceiver({
         signingSecret: signingSecret,
         logLevel: logLevel,
     });
-    app = new App({
+    const app = new App({
         token: slackBotToken,
         receiver: receiver,
         logLevel: logLevel,
@@ -83,12 +78,12 @@ const init = async () => {
     app.command("/standup", async ({ack, body, client, logger,}) => {
         await ack();
 
-        let args = body.text;
+        const args = body.text;
         const today = new Date();
 
         if (args == "help") {
-            let message = "How to use /standup"
-            let attachments = [];
+            const message = "How to use /standup"
+            const attachments = [];
             attachments.push({
                 "text": "`/standup` and enter your status in the modal"
                     + "\n`/standup [parking-lot | parking_lot | parkinglot | -p]` to display items in the parking lot (visible only to you)"
@@ -120,7 +115,7 @@ const init = async () => {
             }, false);
         } else {
             try {
-                let payload = await slackBot.buildNewMessageModalView(body, client);
+                const payload = await slackBot.buildNewMessageModalView(body, client);
                 const result = await slackBot.messageWithSlackApi(body.user_id, today, client, "views.open",
                     payload
                     , false);
@@ -155,8 +150,8 @@ const init = async () => {
     /**
      *  Validate that the bot is in channel, then delegate to a worker lambda.
      */
-    app.view("standup_view", async ({ack, body, view, client, logger, context}) => {
-        let timer = new Timer();
+    app.view("standup_view", async ({ack, body, view, client, logger}) => {
+        const timer = new Timer();
         if (timerEnabled) {
             timer.startTimer();
         }
@@ -180,7 +175,7 @@ const init = async () => {
     async function handleStandupModalSubmission(viewInput: StandupViewData, body: SlackViewAction, client: WebClient, logger: Logger) {
         try {
             // When a messageId is present we are editing a message
-            const isEdit: boolean = !!viewInput.pm.messageId;
+            const isEdit = !!viewInput.pm.messageId;
             const channelId = viewInput.pm.channelId!;
             const userId = viewInput.pm.userId!;
             const today = new Date();
@@ -192,9 +187,9 @@ const init = async () => {
             // must be deleted and posted to channel
             if (viewInput.pm.messageType === "scheduled" && isEdit) {
                 // If this is an edit schedule message, delete the existing one
-                let command = new ChangeMessageCommand(viewInput.pm.messageId!, channelId, userId,
+                const command = new ChangeMessageCommand(viewInput.pm.messageId!, channelId, userId,
                     viewInput.pm.messageDate!);
-                const result = await slackBot.deleteScheduledMessage(command, client, logger);
+                await slackBot.deleteScheduledMessage(command, client, logger);
                 // Don't update the user, but do update the home screen
                 // await slackBot.messageWithSlackApi(userId, today, client, "chat.postEphemeral",
                 //     result as ChatPostEphemeralArguments, true);
@@ -203,13 +198,13 @@ const init = async () => {
             // If we have a scheduleDateTime, schedule a new message
             if (viewInput.scheduleDateTime) {
                 // Schedule a new message
-                let scheduleStr = formatDateToPrintableWithTime(viewInput.scheduleDateTime, viewInput.timezone!);
+                const scheduleStr = formatDateToPrintableWithTime(viewInput.scheduleDateTime, viewInput.timezone!);
 
                 const chatMessageArgs = await slackBot.createChatMessage(viewInput, client);
                 logger.info("Scheduling message for " + scheduleStr + " with input " + viewInput.scheduleDateTime);
                 // Unix timestamp is seconds since epoch
                 chatMessageArgs.post_at = viewInput.scheduleDateTime / 1000;
-                let scheduleResponse = await slackBot.messageWithSlackApi(userId, today, client, "chat.scheduleMessage",
+                const scheduleResponse = await slackBot.messageWithSlackApi(userId, today, client, "chat.scheduleMessage",
                     chatMessageArgs as ChatScheduleMessageArguments, true) as ChatScheduleMessageResponse;
 
                 const saveDate = new Date(viewInput.scheduleDateTime);
@@ -219,16 +214,11 @@ const init = async () => {
                 // timezone is assumed present with scheduleDateTime
                 await slackBot.saveStatusData(viewInput, saveDate, "scheduled", viewInput.timezone!);
 
-
-                const date = new Date(scheduleResponse.post_at! * 1000);
-                // @ts-ignore
-                // logger.info(`Message id ${scheduleResponse.scheduled_message_id} scheduled to send ${formatDateToPrintableWithTime(date.getTime(), viewInput.timezone)} for channel ${scheduleResponse.channel} `);
-
                 const msgId = scheduleResponse.scheduled_message_id!;
                 // Response userID is bot ID, get this data from PrivateMetadata
-                let command = new ChangeMessageCommand(msgId, channelId, userId,
+                const command = new ChangeMessageCommand(msgId, channelId, userId,
                     viewInput.scheduleDateTime);
-                let confMessage = slackBot.buildScheduledMessageConfirmationAndLink(command, viewInput.timezone!, appId, teamId!, chatMessageArgs.blocks!);
+                const confMessage = slackBot.buildScheduledMessageConfirmationAndLink(command, viewInput.timezone!, appId, teamId!, chatMessageArgs.blocks!);
 
                 await slackBot.messageWithSlackApi(userId, today, client, "chat.postEphemeral", confMessage, true);
             }
@@ -282,7 +272,7 @@ const init = async () => {
             }
         } catch (error) {
             logger.error(error);
-            let msg = (error as Error).message;
+            const msg = (error as Error).message;
             const viewArgs = slackBot.buildErrorMessage(viewInput.pm.channelId!, viewInput.pm.userId!, msg) as ChatPostEphemeralArguments;
             try {
                 await slackBot.messageWithSlackApi(viewInput.pm.userId!, new Date(), client, "chat.postEphemeral", viewArgs);
@@ -298,9 +288,9 @@ const init = async () => {
      *
      * ack() the request and then forward the request to another lambda function.
      */
-    app.action({block_id: blockId}, async ({ack, body, client, logger, context}) => {
+    app.action({block_id: blockId}, async ({ack, body, client, logger}) => {
             // logger.info("Action received: ", JSON.stringify(body, null, 2));
-            let timer = new Timer();
+            const timer = new Timer();
             if (timerEnabled) {
                 timer.startTimer();
             }
