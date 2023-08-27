@@ -9,7 +9,7 @@ provider:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
     stage: ${self:provider.stage}
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'us-west-2'}
+  region: ${opt:region, 'us-east-2'}
   memorySize: 256
   logRetentionInDays: 5
   iamRoleStatements:
@@ -88,64 +88,74 @@ resources:
           Enabled: true
 functions:
   slack:
-    provisionedConcurrency: 1
-    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
-    warmup:
-#      outOfOfficeHoursWarmer:
-      default:
-        enabled: true
+# -- enable these two lines for provisioned concurrency --
+#    provisionedConcurrency: 1
+#    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
+# -- enable for warmer --
+#     warmup:
+#       default:
+#         enabled: true
     handler: src/app.handler
     events:
       - http:
           path: slack/events
           method: post
+    iamRoleStatementsInherit: true
+    layers: ${self:custom.secrets-lambda-arns.${self:custom.region}}
 plugins:
   - serverless-webpack
   - serverless-offline
   - serverless-express
-  - serverless-provisioned-concurrency-autoscaling
-  - serverless-plugin-warmup
+  # -- enable for provisioned concurrency --
+  # - serverless-provisioned-concurrency-autoscaling
+  # -- enable for warmup lambda --
+  # - serverless-plugin-warmup
+  - serverless-iam-roles-per-function
 package:
   excludeDevDependencies: true
   individually: true
 custom:
+  region: "${opt:region, self:provider.region}"
+  secrets-lambda-arns:
+    us-east-1: arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
+    us-east-2: arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
+    us-west-1: arn:aws:lambda:us-west-1:997803712105:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:1
+    us-west-2: arn:aws:lambda:us-west-2:345057560386:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules: true
-    #      forceExclude:
-    #        - aws-sdk
     excludeFiles: src/**/*.test.js
-  lambda:
-    concurrencyAutoscaling:
-      enabled: true
-      maximum: 1
-      minimum: 1
-      scheduledActions:
-        - name: OpenOfficeTime
-          timezone: "America/Denver"
-          schedule: "cron(0 5 ? * MON-FRI *)"
-          action:
-            maximum: 1
-            minimum: 1
-        - name: CloseOfficeTime
-          timezone: "America/Denver"
-          schedule: "cron(0 21 ? * MON-FRI *)"
-          action:
-            maximum: 0
-            minimum: 0
-  warmup:
-    default:
-      events:
-        # warm up the lambda no matter what to make async init complete before signature can time out in 5 mins
-        # Another more complex solution would be AWS extension layers, but layers are not well-supported in serverless
-        - schedule: rate(4 minutes)
-#    outOfOfficeHoursWarmer:
-      enabled:
-        - prod
-#      events:
-        # 4-11:59 UTC is 9pm - 4:59am MST
-#        - schedule: cron(0/5 4-11 ? * MON-FRI *)
-#        - schedule: cron(0/5 * ? * SAT-SUN *)
-      concurrency: 1
-      verbose: false
-      memorySize: 128
+  # -- enable for provisioned concurrency --
+  # lambda:
+  #   concurrencyAutoscaling:
+  #     enabled: true
+  #     maximum: 1
+  #     minimum: 1
+  #     scheduledActions:
+  #       - name: OpenOfficeTime
+  #         timezone: "America/Denver"
+  #         schedule: "cron(0 5 ? * MON-FRI *)"
+  #         action:
+  #           maximum: 1
+  #           minimum: 1
+  #       - name: CloseOfficeTime
+  #         timezone: "America/Denver"
+  #         schedule: "cron(0 21 ? * MON-FRI *)"
+  #         action:
+  #           maximum: 0
+  #           minimum: 0
+# -- enable for warmup lambda --  
+#   warmup:
+#     default:
+#       events:
+#         - schedule: rate(4 minutes)
+#       enabled:
+#         - prod
+#       concurrency: 1
+#       verbose: false
+#       memorySize: 128
+# # -- fine-tuned warmup --
+# #      events:
+#         # 4-11:59 UTC is 9pm - 4:59am MST
+# #        - schedule: cron(0/5 4-11 ? * MON-FRI *)
+# #        - schedule: cron(0/5 * ? * SAT-SUN *)

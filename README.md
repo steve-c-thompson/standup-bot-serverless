@@ -124,7 +124,7 @@ Create a secret in SecretsManager named `SlackStandup-secret-dev` or `SlackStand
 * `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
 
-These can be found on the Slack website. Copy-paste the following values.
+These can be found on the Slack website, at https://api.slack.com. Copy-paste the following values.
 
 #### SLACK_STANDUP_BOT_TOKEN
 In the app's _OAuth & Permissions_:

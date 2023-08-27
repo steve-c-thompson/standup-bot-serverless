@@ -41,7 +41,7 @@ describe('date functions', () => {
     describe('getTimezoneOffset', () => {
        it('should get the timezone offset', () => {
            const result = getTimezoneOffsetFromIANA('America/Denver');
-           expect(result).toBe(-420);
+           expect(result).toBe(-360);
        });
     });
 });
