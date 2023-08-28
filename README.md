@@ -176,8 +176,22 @@ This command will scan the local DynamoDB instance for all items the table `loca
 AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS  --endpoint-url http://localhost:4566
 ```
 
+## Costs
+DynamoDB storage is within the free tier.
+
+Secret storage is under $1, as is provisioned concurrency. Even with a warmer lambda, the amount of lambda calls doesn't exceed the free tier.
+
+In practice, running this for a team is like $2 per month.
+
 ## Known Issues
 Scheduling a message after a Daylight Savings Time boundary will say it's scheduled at the time you selected, but show a different (correct) time on the home screen. It is scheduled at the time you selected, so it's just a formatting issue when the message is scheduled.
+
+Lambda startup is slow and not within the 3 second Slack requirement. A warmer or provisioned concurrency can help with this.
+
+Provisioned concurrency has unpredictable issues with fetching secrets during the init phase. (This is possibly related to this post: https://barker.tech/aws-lambda-nodejs-async-init-88b5c24af567) If the first request to the handler is > 5 minutes after the request for a secret, the lambda will be in a zombie state, able to accept requests but not handle them.
+
+> The last two issues above could be solved by running this on an EC2 instance, but that would require refactoring, a build pipeline for deployment, and would bring cost to maybe $8 per month.
+
 ## Author
 
 👤 **Steve Thompson**
