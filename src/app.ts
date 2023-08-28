@@ -387,15 +387,7 @@ const initPromise = init();
  * @param callback
  */
 module.exports.handler = async (event: any, context: any, callback: any) => {
-    // Get facade segment created by Lambda
-    const segment = tracer.getSegment();
-
-    // Create subsegment for the function and set it as active
-    let handlerSegment
-    if (segment){
-        handlerSegment = segment.addNewSubsegment(`## ${process.env._HANDLER}`);
-        tracer.setSegment(handlerSegment);
-    } 
+    const sp = startTrace(tracer, `## ${process.env._HANDLER}`);
 
     // Annotate the subsegment with the cold start and serviceName
     tracer.annotateColdStart();
@@ -414,15 +406,8 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
         return "App Lambda warmed up";
     }
 
-    if(handlerSegment){
-        handlerSegment.close();
-    }
-    
+    endTrace(tracer, sp);
 
-    // Set the facade segment as active again (the one created by Lambda)
-    if (segment){
-        tracer.setSegment(segment);
-    }
     return handler(event, context, callback);
 }
 
