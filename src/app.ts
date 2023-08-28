@@ -28,6 +28,11 @@ import {formatDateToPrintableWithTime} from "./utils/datefunctions";
 import {ChatPostEphemeralArguments} from "@slack/web-api/dist/methods";
 import {ACTION_NAMES} from "./bot/ViewConstants";
 import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
+	
+import { Tracer } from '@aws-lambda-powertools/tracer';
+import { endTrace, startTrace } from './utils/tracing';
+
+const tracer = new Tracer();
 
 /**
  * This is a slack bot that allows users to enter their standup status.
@@ -47,10 +52,19 @@ import {AwsSecretsDataSource} from "./secrets/AwsSecretsDataSource";
  * want that lambda hanging around.
  */
 const init = async () => {
+
+    // // Get facade segment created by Lambda
+    // const segment = tracer.getSegment();
+    // // Create subsegment for the function and set it as active
+    // let initSegment;
+    // if (segment){
+    //     initSegment = segment.addNewSubsegment(`INIT ## ${process.env._HANDLER}`);
+    //     tracer.setSegment(initSegment);
+    // }
     
     const logLevel = LogLevel.INFO;
 
-    const timerEnabled = true;
+    const timerEnabled = false;
 
     const dataSource = new AwsSecretsDataSource(appContext.secretsManager);
     const signingSecret = await dataSource.slackSigningSecret();
@@ -76,6 +90,8 @@ const init = async () => {
      * Note: ideally we would check if the bot is in the channel, but that is not possible with the current slack api.
      */
     app.command("/standup", async ({ack, body, client, logger,}) => {
+        
+        // const sp = startTrace(tracer, "/standup");
         await ack();
 
         const args = body.text;
@@ -151,6 +167,7 @@ const init = async () => {
      *  Validate that the bot is in channel, then delegate to a worker lambda.
      */
     app.view("standup_view", async ({ack, body, view, client, logger}) => {
+        // const sp = startTrace(tracer, "standup_view");
         const timer = new Timer();
         if (timerEnabled) {
             timer.startTimer();
@@ -169,10 +186,11 @@ const init = async () => {
         }
 
         await handleStandupModalSubmission(viewInput, body, client, logger);
-
+        // endTrace(tracer, sp);
     });
 
     async function handleStandupModalSubmission(viewInput: StandupViewData, body: SlackViewAction, client: WebClient, logger: Logger) {
+        // const sp = startTrace(tracer, "/standup");
         try {
             // When a messageId is present we are editing a message
             const isEdit = !!viewInput.pm.messageId;
@@ -281,6 +299,9 @@ const init = async () => {
                 logger.error("Secondary error", e);
             }
         }
+        // finally {
+        //     endTrace(tracer, sp);
+        // }
     }
 
     /**
@@ -305,6 +326,7 @@ const init = async () => {
     );
 
     async function handleActionSubmit(body: SlackAction, client: WebClient, logger: Logger) {
+        // const sp = startTrace(tracer, "/standup");
         try {
             const action = (body as BlockAction)["actions"][0];
             let result;
@@ -340,8 +362,17 @@ const init = async () => {
                 user: (body as BlockAction).user.id
             });
         }
+        // finally {
+        //     endTrace(tracer, sp);
+        // }
     }
     // logger.info("App initialized");
+    // if (initSegment && segment){
+    //     initSegment.close();
+
+    //     // Set the facade segment as active again (the one created by Lambda)
+    //     tracer.setSegment(segment);
+    // }
     return receiver.start();
 }
 // Store the init promise in module scope so that subsequent calls to init() return the resolved promise
@@ -356,6 +387,23 @@ const initPromise = init();
  * @param callback
  */
 module.exports.handler = async (event: any, context: any, callback: any) => {
+    // Get facade segment created by Lambda
+    const segment = tracer.getSegment();
+
+    // Create subsegment for the function and set it as active
+    let handlerSegment
+    if (segment){
+        handlerSegment = segment.addNewSubsegment(`## ${process.env._HANDLER}`);
+        tracer.setSegment(handlerSegment);
+    } 
+
+    // Annotate the subsegment with the cold start and serviceName
+    tracer.annotateColdStart();
+    tracer.addServiceNameAnnotation();
+
+    // Add annotation for the awsRequestId
+    tracer.putAnnotation('awsRequestId', context.awsRequestId);
+
     // logger.info("App Lambda invoked");
     const handler = await initPromise;
     // logger.info("APP EVENT RECEIVED " + JSON.stringify(event, null, 2));
@@ -366,6 +414,15 @@ module.exports.handler = async (event: any, context: any, callback: any) => {
         return "App Lambda warmed up";
     }
 
+    if(handlerSegment){
+        handlerSegment.close();
+    }
+    
+
+    // Set the facade segment as active again (the one created by Lambda)
+    if (segment){
+        tracer.setSegment(segment);
+    }
     return handler(event, context, callback);
 }
 
