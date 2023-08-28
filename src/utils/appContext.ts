@@ -15,12 +15,13 @@ export interface Context {
     secretsManager : SecretsManager;
     secretName: SecretName;
     dynamoDbClient: DynamoDB;
-    tableNamePrefix: DynamoTableNamePrefix
+    tableNamePrefix: DynamoTableNamePrefix;
+    isLocalContext(): boolean;
 }
 
 function createContext(): Context {
     logger.info("Creating appContext for prod");
-    // If you want a lot of logging...
+    // Lots of logging
     // AWS.config.update({
     //    logger: console
     // });
@@ -29,6 +30,7 @@ function createContext(): Context {
         secretName: "SlackStandup-secret-prod",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "prod_",
+        isLocalContext(){ return isLocal() } 
     };
 }
 
@@ -42,6 +44,7 @@ function createDevContext(): Context {
         secretName: "SlackStandup-secret-dev",
         dynamoDbClient: new DynamoDB({}),
         tableNamePrefix: "dev_",
+        isLocalContext(){ return isLocal() } 
     };
 }
 
@@ -67,8 +70,8 @@ function createLocalContext(): Context {
         secretsManager: new SecretsManager({
             endpoint: "http://localhost:4566",
             credentials: {
-                accessKeyId: AWS.config.credentials?.accessKeyId!,
-                secretAccessKey: AWS.config.credentials?.secretAccessKey!
+                accessKeyId: AWS.config.credentials!.accessKeyId!,
+                secretAccessKey: AWS.config.credentials!.secretAccessKey!
             },
             region: AWS.config.region,
         }),
@@ -76,12 +79,13 @@ function createLocalContext(): Context {
         dynamoDbClient: new DynamoDB({
             endpoint: "http://localhost:4566",
             credentials: {
-                accessKeyId: AWS.config.credentials?.accessKeyId!,
-                secretAccessKey: AWS.config.credentials?.secretAccessKey!
+                accessKeyId: AWS.config.credentials!.accessKeyId!,
+                secretAccessKey: AWS.config.credentials!.secretAccessKey!
             },
             region: AWS.config.region,
         }),
         tableNamePrefix: "local_",
+        isLocalContext(){ return isLocal() } 
     };
 }
 export const blockId = new RegExp("change-msg-.*");
