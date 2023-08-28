@@ -102,6 +102,7 @@ functions:
           method: post
     iamRoleStatementsInherit: true
     layers: ${self:custom.secrets-lambda-arns.${self:custom.region}}
+    tracing: Active
 plugins:
   - serverless-webpack
   - serverless-offline

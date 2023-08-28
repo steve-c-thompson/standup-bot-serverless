@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "@aws-cdk/aws-secretsmanager": "^1.194.0",
+    "@aws-lambda-powertools/tracer": "^1.12.1",
     "@aws-sdk/client-lambda": "^3.280.0",
     "@aws-sdk/client-secrets-manager": "^3.279.0",
     "@aws/dynamodb-data-mapper": "^0.7.3",
@@ -62,6 +63,7 @@
     "@types/aws-lambda": "^8.10.110",
     "@types/cross-spawn": "^6.0.2",
     "@types/jest": "^29.4.0",
+    "aws-xray-sdk": "^3.5.1",
     "dayjs": "^1.11.7",
     "dayjs-plugin-utc": "^0.1.2",
     "dotenv": "^16.0.3",
