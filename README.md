@@ -139,7 +139,7 @@ In the app's _Basic Settings_ copy the value for _Signing Secret_:
 ## Local Development
 Testing locally requires Docker, and setting the following environment variables in a `.env` file. These are the same values found in the **Secrets** section of this document.
 
-* `SLACK_STANDUP_TOKEN`
+* `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
 
 Deploy to Docker with the following command:

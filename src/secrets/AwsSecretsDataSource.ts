@@ -2,8 +2,8 @@ import {GetSecretValueCommandOutput, SecretsManager} from "@aws-sdk/client-secre
 import {SlackSecret, SecretDataSource, SecretKey} from "./SecretDataSource";
 import {appContext, logger} from "../utils/appContext";
 
-const AWS_SECRETS_EXTENTION_HTTP_PORT = 2773;
-const AWS_SECRETS_EXTENTION_SERVER_ENDPOINT = `http://localhost:${AWS_SECRETS_EXTENTION_HTTP_PORT}/secretsmanager/get?secretId=`;
+const AWS_SECRETS_EXTENSION_HTTP_PORT = 2773;
+const AWS_SECRETS_EXTENSION_SERVER_ENDPOINT = `http://localhost:${AWS_SECRETS_EXTENSION_HTTP_PORT}/secretsmanager/get?secretId=`;
 
 export class AwsSecretsDataSource implements SecretDataSource{
     secretsManager: SecretsManager;
@@ -50,7 +50,7 @@ export class AwsSecretsDataSource implements SecretDataSource{
     }
 
     private async getLayerSecretValue (secretName: string) {
-        const url = `${AWS_SECRETS_EXTENTION_SERVER_ENDPOINT}${appContext.secretName}`;
+        const url = `${AWS_SECRETS_EXTENSION_SERVER_ENDPOINT}${appContext.secretName}`;
         const response = await fetch(url, {
           method: "GET",
           headers: {

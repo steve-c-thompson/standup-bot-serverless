@@ -52,15 +52,6 @@ const tracer = new Tracer();
  * want that lambda hanging around.
  */
 const init = async () => {
-
-    // // Get facade segment created by Lambda
-    // const segment = tracer.getSegment();
-    // // Create subsegment for the function and set it as active
-    // let initSegment;
-    // if (segment){
-    //     initSegment = segment.addNewSubsegment(`INIT ## ${process.env._HANDLER}`);
-    //     tracer.setSegment(initSegment);
-    // }
     
     const logLevel = LogLevel.INFO;
 

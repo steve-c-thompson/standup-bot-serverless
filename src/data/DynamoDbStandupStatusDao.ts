@@ -5,10 +5,10 @@ import {
   PutCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { StandupStatusDao } from "./StandupStatusDao.js";
-import { StandupStatus, StatusMessage } from "./StandupStatus.js";
+import { StandupStatusDao } from "./StandupStatusDao";
+import { StandupStatus, StatusMessage } from "./StandupStatus";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { createZeroUtcDate } from "../utils/datefunctions.js";
+import { createZeroUtcDate } from "../utils/datefunctions";
 import {
   appContext,
   logger,

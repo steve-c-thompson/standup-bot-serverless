@@ -4,7 +4,7 @@ import {
     ListSecretsCommand,
     UpdateSecretCommand
 } from "@aws-sdk/client-secrets-manager";
-import {appContext} from "../../utils/appContext.js";
+import {appContext, logger} from "../../utils/appContext.js";
 import * as dotenv from 'dotenv';
 import * as url from 'node:url';
 
@@ -16,8 +16,11 @@ export async function createSecretsFromEnv() {
     dotenv.config();
     const secretName = appContext.secretName;
 
-    const secretString = `{"SLACK_STANDUP_SIGNING_SECRET": "${process.env.SLACK_STANDUP_SIGNING_SECRET}" ,"SLACK_STANDUP_BOT_TOKEN": "${process.env.SLACK_STANDUP_BOT_TOKEN}"}`;
+    if(!process.env.SLACK_STANDUP_SIGNING_SECRET || !process.env.SLACK_STANDUP_BOT_TOKEN){
+        throw new Error("Missing environment variables. Be sure you have created a .env file");
+    }
 
+    const secretString = `{"SLACK_STANDUP_SIGNING_SECRET": "${process.env.SLACK_STANDUP_SIGNING_SECRET}" ,"SLACK_STANDUP_BOT_TOKEN": "${process.env.SLACK_STANDUP_BOT_TOKEN}"}`;
     const client = appContext.secretsManager;
 
     // See if secret exists
@@ -27,24 +30,24 @@ export async function createSecretsFromEnv() {
     const foundSecret = secrets.SecretList?.find(s => s.Name === secretName);
     let command : CreateSecretCommand | UpdateSecretCommand;
     if(foundSecret) {
-        console.log("Updating secret " + secretName);
+        console.debug("Updating secret " + secretName);
         command = new UpdateSecretCommand({
             SecretId: foundSecret.ARN,
             SecretString: secretString
         });
         const response = await client.send(command);
-        // console.log(response);
+        logger.debug(response);
     }
     else {
-        console.log("Creating new secret " + secretName);
+        console.debug("Creating new secret " + secretName);
         command = new CreateSecretCommand({
             Name: secretName,
             SecretString: secretString
         });
         const response = await client.send(command);
-        // console.log(response);
+        logger.debug(response);
     }
-    console.log("Secret created successfully");
+    logger.debug("Secret created successfully");
 }
 
 // Must include this here or move calculation of caller somehow.
