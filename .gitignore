@@ -123,3 +123,6 @@ dist
 volume
 
 .warmup
+
+.webpack
+.esbuild

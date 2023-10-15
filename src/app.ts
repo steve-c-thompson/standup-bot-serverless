@@ -99,13 +99,14 @@ const init = async () => {
 
         if (args == "help") {
             const message = "How to use /standup"
-            const attachments = [];
-            attachments.push({
+            const attachments = [
+            {
                 "text": "`/standup` and enter your status in the modal"
                     + "\n`/standup [parking-lot | parking_lot | parkinglot | -p]` to display items in the parking lot (visible only to you)"
                     + "\n`/standup post [parking-lot | parking_lot | parkinglot | -p]` to post parking lot items to channel"
 
-            });
+            }
+            ];
             await slackBot.messageWithSlackApi(body.user_id, today, client, "chat.postEphemeral", {
                 text: message,
                 attachments: attachments,
@@ -358,7 +359,7 @@ const init = async () => {
             logger.error(e);
             await slackBot.messageWithSlackApi((body as BlockAction).user.id, new Date(), client, "chat.postEphemeral", {
                 text: "An error occurred " + e,
-                channel: (body as BlockAction).channel?.id!,
+                channel: (body as BlockAction).channel!.id!,
                 user: (body as BlockAction).user.id
             });
         }
@@ -376,7 +377,9 @@ const init = async () => {
     return receiver.start();
 }
 // Store the init promise in module scope so that subsequent calls to init() return the resolved promise
-const initPromise = init();
+
+// top-level await for esmodule
+const initPromise = await init();
 
 /**
  * Handle the lambda event. This is the entry point for the lambda function.
@@ -386,7 +389,7 @@ const initPromise = init();
  * @param context
  * @param callback
  */
-module.exports.handler = async (event: any, context: any, callback: any) => {
+export const handler = async (event: any, context: any, callback: any) => {
     const sp = startTrace(tracer, `## ${process.env._HANDLER}`);
 
     // Annotate the subsegment with the cold start and serviceName

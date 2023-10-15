@@ -1,7 +1,12 @@
 #!/usr/bin/env ts-node-script
 
 import { sync } from "cross-spawn";
+import * as url from 'node:url';
 import * as path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ROOT_DIR = path.join(__dirname, "../../..");
 
@@ -31,6 +36,14 @@ async function waitForLocalStack() {
   }
 }
 
-if (require.main === module) {
-  startLocalStack();
+function requireMain(callback: () => void): void {
+  if (import.meta.url.startsWith('file:')) { // (A)
+      const modulePath = url.fileURLToPath(import.meta.url);
+      if (process.argv[1] === modulePath) { // (B)
+        // Main ESM module
+        callback();
+      }
+  }
 }
+
+requireMain(startLocalStack)

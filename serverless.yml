@@ -104,14 +104,14 @@ functions:
     layers: ${self:custom.secrets-lambda-arns.${self:custom.region}}
     tracing: Active
 plugins:
-  - serverless-webpack
-  - serverless-offline
   - serverless-express
+  - serverless-webpack
   # -- enable for provisioned concurrency --
   # - serverless-provisioned-concurrency-autoscaling
   # -- enable for warmup lambda --
   # - serverless-plugin-warmup
   - serverless-iam-roles-per-function
+  - serverless-offline
 package:
   excludeDevDependencies: true
   individually: true
@@ -123,9 +123,23 @@ custom:
     us-west-1: arn:aws:lambda:us-west-1:997803712105:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:1
     us-west-2: arn:aws:lambda:us-west-2:345057560386:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
   webpack:
-    webpackConfig: ./webpack.config.js
+    webpackConfig: 'webpack.config.cjs'
     includeModules: true
     excludeFiles: src/**/*.test.js
+    packagerOptions:
+      copyPackageSectionNames:
+        - type
+        - exports
+        - main
+  # esbuild:
+  #   # https://github.com/floydspace/serverless-esbuild/issues/483#issuecomment-1718837093
+  #   format: esm
+  #   outputFileExtension: .mjs
+  #   # plugins:
+  #   #   ./src/esbuild-plugins.js
+  #   banner:
+  #     js: import { createRequire } from 'module';const require = (await import('node:module')).createRequire(import.meta.url);const __filename = (await import('node:url')).fileURLToPath(import.meta.url);const __dirname = (await import('node:path')).dirname(__filename);
+    
   # -- enable for provisioned concurrency --
   # lambda:
   #   concurrencyAutoscaling:

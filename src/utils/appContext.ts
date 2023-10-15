@@ -1,5 +1,4 @@
-import * as AWS from "aws-sdk";
-import {DynamoDB} from "aws-sdk";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
 import {ConsoleLogger} from "@slack/logger";
 
@@ -14,21 +13,17 @@ export const appContext: Context = isLocal() ? createLocalContext() : isDev()? c
 export interface Context {
     secretsManager : SecretsManager;
     secretName: SecretName;
-    dynamoDbClient: DynamoDB;
+    dynamoDbClient: DynamoDBClient;
     tableNamePrefix: DynamoTableNamePrefix;
     isLocalContext(): boolean;
 }
 
 function createContext(): Context {
     logger.info("Creating appContext for prod");
-    // Lots of logging
-    // AWS.config.update({
-    //    logger: console
-    // });
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-prod",
-        dynamoDbClient: new DynamoDB({}),
+        dynamoDbClient: new DynamoDBClient({}),
         tableNamePrefix: "prod_",
         isLocalContext(){ return isLocal() } 
     };
@@ -36,13 +31,10 @@ function createContext(): Context {
 
 function createDevContext(): Context {
     logger.info("Creating appContext for dev");
-    AWS.config.update({
-        logger: console
-    });
     return {
         secretsManager: new SecretsManager({}),
         secretName: "SlackStandup-secret-dev",
-        dynamoDbClient: new DynamoDB({}),
+        dynamoDbClient: new DynamoDBClient({}),
         tableNamePrefix: "dev_",
         isLocalContext(){ return isLocal() } 
     };
@@ -58,31 +50,31 @@ function isDev(): boolean {
 
 function createLocalContext(): Context {
     logger.info("Creating appContext for local");
-    AWS.config.update({
+    const config = {
         accessKeyId: "not-a-real-access-key-id",
         secretAccessKey: "not-a-real-access-key",
-        region: "us-west-2",
+        region: "us-east-2",
         // Uncomment to see localstack calls in the console
         // logger: console,
-    });
+    };
 
     return {
         secretsManager: new SecretsManager({
             endpoint: "http://localhost:4566",
             credentials: {
-                accessKeyId: AWS.config.credentials!.accessKeyId!,
-                secretAccessKey: AWS.config.credentials!.secretAccessKey!
+                accessKeyId: config.accessKeyId!,
+                secretAccessKey: config.secretAccessKey!
             },
-            region: AWS.config.region,
+            region: config.region,
         }),
         secretName: "SlackStandup-secret-dev",
-        dynamoDbClient: new DynamoDB({
+        dynamoDbClient: new DynamoDBClient({
             endpoint: "http://localhost:4566",
             credentials: {
-                accessKeyId: AWS.config.credentials!.accessKeyId!,
-                secretAccessKey: AWS.config.credentials!.secretAccessKey!
+                accessKeyId: config.accessKeyId!,
+                secretAccessKey: config.secretAccessKey!
             },
-            region: AWS.config.region,
+            region: config.region,
         }),
         tableNamePrefix: "local_",
         isLocalContext(){ return isLocal() } 

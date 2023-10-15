@@ -173,7 +173,7 @@ The `context.ts` file sets up some fake credentials, and we need these to query 
 
 This command will scan the local DynamoDB instance for all items the table `local_STANDUP_STATUS`.
 ```
-AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS  --endpoint-url http://localhost:4566
+AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS --region us-east-2 --endpoint-url http://localhost:4566
 ```
 
 ## Costs
