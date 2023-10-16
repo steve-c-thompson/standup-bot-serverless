@@ -12,7 +12,7 @@ export class AwsSecretsDataSource implements SecretDataSource{
     }
 
     async buildSecretPromise(secretToken: SecretKey) : Promise<string> {
-        logger.info("Fetching secretToken " + secretToken + " from secret named " + appContext.secretName);
+        logger.debug("Fetching secretToken " + secretToken + " from secret named " + appContext.secretName);
 
         const result = await this.secretsManager.getSecretValue({SecretId: appContext.secretName});
         return this.parseSecretForToken(result, secretToken);
@@ -25,7 +25,7 @@ export class AwsSecretsDataSource implements SecretDataSource{
             if (!val) {
                 throw new Error(`Secret ${secretToken} not found`);
             }
-            logger.info("Found secretToken " + secretToken + ", adding to cache");
+            logger.debug("Found secretToken " + secretToken + ", adding to cache");
             return val
         }
         else {
@@ -43,10 +43,10 @@ export class AwsSecretsDataSource implements SecretDataSource{
     }
 
     private async selectLocalOrLayerSecret(s: SecretKey) {
-        if(appContext.isLocalContext())
+        // if(appContext.isLocalContext())
             return this.buildSecretPromise(s);
-        else
-            return this.getLayerSecretValue(s);
+        // else
+        //     return this.getLayerSecretValue(s);
     }
 
     private async getLayerSecretValue (secretName: string) {
@@ -59,8 +59,9 @@ export class AwsSecretsDataSource implements SecretDataSource{
         });
       
         if (!response.ok) {
+            const len = process.env.AWS_SESSION_TOKEN?.length ?? 0;
           throw new Error(
-            `Error occured while requesting secret ${secretName}. Responses status was ${response.status}`
+            `Error occured while requesting secret ${secretName} from url ${url} using token with length ${len}. Responses status was ${response.status} with headers ${JSON.stringify(response.headers)} and status text ${response.statusText} and body ${JSON.stringify(response.body)}`
           );
         }
         logger.info(`Retrieving secret ${secretName} from Layer`);

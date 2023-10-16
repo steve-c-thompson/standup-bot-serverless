@@ -1,12 +1,13 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {SecretsManager} from "@aws-sdk/client-secrets-manager";
-import {ConsoleLogger} from "@slack/logger";
+import {ConsoleLogger, LogLevel} from "@slack/logger";
 
-export type SecretName = "SlackStandup-secret-prod" | "SlackStandup-secret-dev";
+export type SecretName = "SlackStandup_Secret_prod" | "SlackStandup_Secret_dev";
 export const standupStatusTableName = "STANDUP_STATUS";
 export type DynamoTableNamePrefix = "dev_" | "prod_" | "local_";
 
 export const logger = new ConsoleLogger()
+// logger.setLevel(LogLevel.DEBUG);
 
 export const appContext: Context = isLocal() ? createLocalContext() : isDev()? createDevContext() : createContext();
 
@@ -22,7 +23,7 @@ function createContext(): Context {
     logger.info("Creating appContext for prod");
     return {
         secretsManager: new SecretsManager({}),
-        secretName: "SlackStandup-secret-prod",
+        secretName: "SlackStandup_Secret_prod",
         dynamoDbClient: new DynamoDBClient({}),
         tableNamePrefix: "prod_",
         isLocalContext(){ return isLocal() } 
@@ -33,7 +34,7 @@ function createDevContext(): Context {
     logger.info("Creating appContext for dev");
     return {
         secretsManager: new SecretsManager({}),
-        secretName: "SlackStandup-secret-dev",
+        secretName: "SlackStandup_Secret_dev",
         dynamoDbClient: new DynamoDBClient({}),
         tableNamePrefix: "dev_",
         isLocalContext(){ return isLocal() } 
@@ -67,7 +68,7 @@ function createLocalContext(): Context {
             },
             region: config.region,
         }),
-        secretName: "SlackStandup-secret-dev",
+        secretName: "SlackStandup_Secret_dev",
         dynamoDbClient: new DynamoDBClient({
             endpoint: "http://localhost:4566",
             credentials: {

@@ -390,8 +390,7 @@ export const handler = async (event: any, context: any, callback: any) => {
     // Add annotation for the awsRequestId
     tracer.putAnnotation('awsRequestId', context.awsRequestId);
 
-    // logger.info("App Lambda invoked");
-    const handler = await initPromise;
+    const handler = initPromise;
     // logger.info("APP EVENT RECEIVED " + JSON.stringify(event, null, 2));
     // Look for events from serverless-plugin-warmup or AWS scheduled events
     if(event.source === 'serverless-plugin-warmup' || event.source === 'aws.events') {

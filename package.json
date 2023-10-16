@@ -1,7 +1,7 @@
 {
   "name": "standup-bot",
   "version": "1.0.0",
-  "exports": "./app.js",
+  "exports": "./app.mjs",
   "type": "module",
   "scripts": {
     "build": "tsc -p .",
@@ -38,6 +38,8 @@
     "@types/node": "^18.11.18",
     "@typescript-eslint/eslint-plugin": "^5.49.0",
     "@typescript-eslint/parser": "^5.49.0",
+    "aws-crt": "^1.18.0",
+    "bufferutil": "^4.0.7",
     "esbuild": "0.17.19",
     "jest": "^29.4.1",
     "jest-config": "^29.4.1",
@@ -51,6 +53,7 @@
     "source-map-loader": "^4.0.1",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.4",
+    "utf-8-validate": "^5.0.10",
     "webpack": "^5.89.0"
   },
   "dependencies": {

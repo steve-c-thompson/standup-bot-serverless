@@ -119,7 +119,7 @@ sls print --stage (prod | dev)
 ```
 
 ### Secrets
-Create a secret in SecretsManager named `SlackStandup-secret-dev` or `SlackStandup-secret-prod`, depending on the target environment, with the values
+Create a secret in SecretsManager named `SlackStandup_secret_dev` or `SlackStandup_secret_prod`, depending on the target environment, with the values
 
 * `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
