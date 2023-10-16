@@ -119,7 +119,7 @@ sls print --stage (prod | dev)
 ```
 
 ### Secrets
-Create a secret in SecretsManager named `SlackStandup-secret-dev` or `SlackStandup-secret-prod`, depending on the target environment, with the values
+Create a secret in SecretsManager named `SlackStandup_secret_dev` or `SlackStandup_secret_prod`, depending on the target environment, with the values
 
 * `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
@@ -139,7 +139,7 @@ In the app's _Basic Settings_ copy the value for _Signing Secret_:
 ## Local Development
 Testing locally requires Docker, and setting the following environment variables in a `.env` file. These are the same values found in the **Secrets** section of this document.
 
-* `SLACK_STANDUP_TOKEN`
+* `SLACK_STANDUP_BOT_TOKEN`
 * `SLACK_STANDUP_SIGNING_SECRET`
 
 Deploy to Docker with the following command:
@@ -173,7 +173,7 @@ The `context.ts` file sets up some fake credentials, and we need these to query 
 
 This command will scan the local DynamoDB instance for all items the table `local_STANDUP_STATUS`.
 ```
-AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS  --endpoint-url http://localhost:4566
+AWS_ACCESS_KEY_ID=not-a-real-access-key-id AWS_SECRET_ACCESS_KEY=not-a-real-access-key aws dynamodb scan --table-name local_STANDUP_STATUS --region us-east-2 --endpoint-url http://localhost:4566
 ```
 
 ## Costs

@@ -1,5 +1,5 @@
 service: slack-standup
-frameworkVersion: '3'
+frameworkVersion: "3"
 provider:
   architecture: arm64
   lambdaHashingVersion: "20201221"
@@ -8,14 +8,16 @@ provider:
   environment:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
     stage: ${self:provider.stage}
+    PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL: debug
+    AWS_XRAY_CONTEXT_MISSING: "IGNORE_ERROR"
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-2'}
   memorySize: 256
   logRetentionInDays: 5
   iamRoleStatements:
-    - Effect: 'Allow'
+    - Effect: "Allow"
       Action:
-        - 'lambda:InvokeFunction'
+        - "lambda:InvokeFunction"
       Resource:
         - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${opt:stage, self:provider.stage}-*
     - Effect: "Allow"
@@ -23,12 +25,12 @@ provider:
         - "secretsmanager:GetSecretValue"
       Resource:
         Fn::Join:
-          - ':'
-          - - 'arn:aws:secretsmanager'
+          - ":"
+          - - "arn:aws:secretsmanager"
             - ${self:provider.region}
-            - Ref: 'AWS::AccountId'
-            - 'secret'
-            - 'SlackStandup-secret-*'
+            - Ref: "AWS::AccountId"
+            - "secret"
+            - "SlackStandup_Secret_*"
     - Effect: Allow
       Action:
         - dynamodb:Query
@@ -38,25 +40,25 @@ provider:
         - dynamodb:DeleteItem
       Resource:
         Fn::Join:
-          - ':'
-          - - 'arn:aws:dynamodb'
+          - ":"
+          - - "arn:aws:dynamodb"
             - ${self:provider.region}
-            - Ref: 'AWS::AccountId'
-            - 'table/*_STANDUP_STATUS'
+            - Ref: "AWS::AccountId"
+            - "table/*_STANDUP_STATUS"
     - Effect: Allow
       Action:
         - dynamodb:Query
       Resource:
         Fn::Join:
-          - ':'
-          - - 'arn:aws:dynamodb'
+          - ":"
+          - - "arn:aws:dynamodb"
             - ${self:provider.region}
-            - Ref: 'AWS::AccountId'
-            - 'table/*_STANDUP_STATUS/index/*'
+            - Ref: "AWS::AccountId"
+            - "table/*_STANDUP_STATUS/index/*"
 resources:
   Resources:
     StatusDynamoDbTable:
-      Type: 'AWS::DynamoDB::Table'
+      Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
@@ -88,13 +90,13 @@ resources:
           Enabled: true
 functions:
   slack:
-# -- enable these two lines for provisioned concurrency --
-#    provisionedConcurrency: 1
-#    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
-# -- enable for warmer --
-#     warmup:
-#       default:
-#         enabled: true
+    # -- enable these two lines for provisioned concurrency --
+    #    provisionedConcurrency: 1
+    #    concurrencyAutoscaling: ${self:custom.lambda.concurrencyAutoscaling}
+    # -- enable for warmer --
+    #     warmup:
+    #       default:
+    #         enabled: true
     handler: src/app.handler
     events:
       - http:
@@ -104,28 +106,42 @@ functions:
     layers: ${self:custom.secrets-lambda-arns.${self:custom.region}}
     tracing: Active
 plugins:
-  - serverless-webpack
-  - serverless-offline
   - serverless-express
+  - serverless-webpack
   # -- enable for provisioned concurrency --
   # - serverless-provisioned-concurrency-autoscaling
   # -- enable for warmup lambda --
   # - serverless-plugin-warmup
   - serverless-iam-roles-per-function
+  - serverless-offline
 package:
   excludeDevDependencies: true
   individually: true
 custom:
   region: "${opt:region, self:provider.region}"
   secrets-lambda-arns:
-    us-east-1: arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
-    us-east-2: arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
-    us-west-1: arn:aws:lambda:us-west-1:997803712105:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:1
-    us-west-2: arn:aws:lambda:us-west-2:345057560386:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:4
+    us-east-1: arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:11
+    us-east-2: arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:11
+    us-west-1: arn:aws:lambda:us-west-1:997803712105:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:8
+    us-west-2: arn:aws:lambda:us-west-2:345057560386:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:11
   webpack:
-    webpackConfig: ./webpack.config.js
+    webpackConfig: "webpack.config.cjs"
     includeModules: true
     excludeFiles: src/**/*.test.js
+    packagerOptions:
+      copyPackageSectionNames:
+        - type
+        - exports
+        - main
+  # esbuild:
+  #   # https://github.com/floydspace/serverless-esbuild/issues/483#issuecomment-1718837093
+  #   format: esm
+  #   outputFileExtension: .mjs
+  #   # plugins:
+  #   #   ./src/esbuild-plugins.js
+  #   banner:
+  #     js: import { createRequire } from 'module';const require = (await import('node:module')).createRequire(import.meta.url);const __filename = (await import('node:url')).fileURLToPath(import.meta.url);const __dirname = (await import('node:path')).dirname(__filename);
+
   # -- enable for provisioned concurrency --
   # lambda:
   #   concurrencyAutoscaling:
@@ -145,7 +161,7 @@ custom:
   #         action:
   #           maximum: 0
   #           minimum: 0
-# -- enable for warmup lambda --  
+# -- enable for warmup lambda --
 #   warmup:
 #     default:
 #       events:

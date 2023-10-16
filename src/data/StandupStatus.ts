@@ -1,100 +1,61 @@
-import {attribute, hashKey, rangeKey, table} from "@aws/dynamodb-data-mapper-annotations";
-import {standupStatusTableName} from "../utils/appContext";
-import {embed} from "@aws/dynamodb-data-mapper";
+import {
+  DynamoDBDateProperty,
+  DynamoDBListProperty,
+} from "../utils/aws/decorators.js";
 
 export type StandupStatusType = "posted" | "scheduled";
 
 export class StatusMessage {
-    public constructor(init?:Partial<StatusMessage>) {
-        Object.assign(this, init);
-    }
+  messageId: string;
+  channelId: string;
+  userId: string;
+  @DynamoDBDateProperty()
+  messageDate: Date;
+  messageType: StandupStatusType;
+  yesterday: string;
+  today: string;
+  parkingLot?: string;
+  parkingLotAttendees?: string[] = [];
+  pullRequests?: string;
+  scheduleDateStr?: string;
+  scheduleTimeStr?: string;
+  @DynamoDBDateProperty()
+  createdAt?: Date = new Date();
+  @DynamoDBDateProperty()
+  updatedAt?: Date = new Date();
 
-    @attribute()
-    messageId: string;
-
-    @attribute()
-    channelId: string;
-
-    @attribute()
-    userId: string;
-
-    @attribute()
-    messageDate: Date;
-
-    @attribute()
-    messageType: StandupStatusType;
-
-    @attribute()
-    yesterday: string;
-
-    @attribute()
-    today: string;
-
-    @attribute()
-    parkingLot?: string;
-
-    @attribute()
-    parkingLotAttendees?: string[] = [];
-
-    @attribute()
-    pullRequests?: string;
-
-    @attribute()
-    scheduleDateStr?: string;
-
-    @attribute()
-    scheduleTimeStr?: string;
-
-    @attribute({defaultProvider: () => new Date()}) createdAt?: Date;
-
-    @attribute({defaultProvider: () => new Date()}) updatedAt?: Date;
+  public constructor(init?: Partial<StatusMessage>) {
+    Object.assign(this, init);
+  }
 }
 
-@table(standupStatusTableName)
 export class StandupStatus {
+  id: string; // A concatenation of channelId#standupDate.getTime(), expected to be epoch midnight for standup
+  // If a standup occurs on Jan1, 2020 in any timezone, the ID will use Jan1, 2020 00:00:00 UTC
+  userId: string;
+  @DynamoDBDateProperty()
+  standupDate: Date = new Date();
+  userTimezoneOffset: number;
+  channelId: string;
+  @DynamoDBListProperty(StatusMessage)
+  statusMessages: Array<StatusMessage> = [];
+  @DynamoDBDateProperty()
+  createdAt?: Date = new Date();
+  @DynamoDBDateProperty()
+  updatedAt?: Date = new Date();
+  @DynamoDBDateProperty()
+  timeToLive?: Date;
 
-    public constructor(init?:Partial<StandupStatus>) {
-        Object.assign(this, init);
+  public constructor(init?: Partial<StandupStatus>) {
+    Object.assign(this, init);
+    if (this.timeToLive === undefined) {
+      const date = new Date();
+      date.setDate(date.getDate() + 1);
+      this.timeToLive = date;
     }
-
-    @hashKey()
-    id: string; // A concatenation of channelId#standupDate.getTime(), expected to be epoch midnight for standup
-                // If a standup occurs on Jan1, 2020 in any timezone, the ID will use Jan1, 2020 00:00:00 UTC
-
-    @rangeKey({
-        type: "String",
-        indexKeyConfigurations: {
-            "userId-index": "HASH",
-        },
-        attributeName: "userId"
-    })
-    userId: string;
-
-    @attribute({
-        defaultProvider: () => {
-            const d = new Date();
-            d.setUTCHours(0, 0, 0, 0);
-            return d;
-        }
-    }) standupDate: Date; // epoch midnight for standup, used in ID
-
-    @attribute()
-    userTimezoneOffset: number; // The timezone offset of the user in minutes
-
-    @attribute()
-    channelId: string;
-
-    @attribute({memberType: embed(StatusMessage)})
-    statusMessages: Array<StatusMessage> = [];
-
-    @attribute({defaultProvider: () => new Date()}) createdAt?: Date;
-
-    @attribute({defaultProvider: () => new Date()}) updatedAt?: Date;
-
-    @attribute({defaultProvider: () => {
-            let date = new Date();
-            date.setDate(date.getDate() + 1);
-            return date;
-        }
-    }) timeToLive?: Date;
+    if (!this.standupDate) {
+      this.standupDate = new Date();
+    }
+    this.standupDate.setUTCHours(0, 0, 0, 0);
+  }
 }
