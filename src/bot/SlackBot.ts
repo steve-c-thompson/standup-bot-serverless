@@ -301,7 +301,7 @@ export class SlackBot {
     private async queryUser(user: string, client: WebClient): Promise<UserInfo> {
         if (this.userInfoCache.has(user)){
             logger.debug("Cache hit for user", user);
-            return Promise.resolve(this.userInfoCache.get(user)!);
+            return this.userInfoCache.get(user)!;
         }
         const resp = await client.users.info({
             user: user
@@ -311,7 +311,8 @@ export class SlackBot {
             name: resp.user?.real_name!,
             userId: user,
             img: resp.user?.profile?.image_72,
-            timezone: resp.user?.tz!
+            timezone: resp.user?.tz!,
+            tzOffset: resp.user?.tz_offset! / 60
         }
         this.userInfoCache.set(user, userInfo);
         return userInfo
@@ -513,12 +514,14 @@ export class SlackBot {
         });
     }
 
-    public getUserTimezone(userId: string, client: WebClient): Promise<string> {
-        return client.users.info({
-            user: userId
-        }).then(resp => {
-            return resp.user?.tz!;
-        });
+    public async getUserTimezone(userId: string, client: WebClient): Promise<string> {
+        if (this.userInfoCache.has(userId)){
+            logger.debug("Cache hit for user", userId);
+            return this.userInfoCache.get(userId)!.timezone;
+        }
+        const userInfo = await this.queryUser(userId, client);
+
+        return userInfo.timezone
     }
 
     /**
@@ -527,11 +530,12 @@ export class SlackBot {
      * @param client
      */
     public async getUserTimezoneOffset(userId: string, client: WebClient): Promise<number> {
-        return client.users.info({
-            user: userId
-        }).then(resp => {
-            return resp.user?.tz_offset! / 60; // convert to minutes
-        });
+        if (this.userInfoCache.has(userId)){
+            logger.debug("Cache hit for user", userId);
+            return this.userInfoCache.get(userId)!.tzOffset;
+        }
+        const userInfo = await this.queryUser(userId, client);
+        return userInfo.tzOffset;
     }
 
     /**
