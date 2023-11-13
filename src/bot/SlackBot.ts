@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 import {Block, Logger, ModalView, SlashCommand, ViewOutput,} from "@slack/bolt";
 import {
     ChannelsInfoResponse, ChatDeleteScheduledMessageResponse,
@@ -24,6 +25,8 @@ export class SlackBot {
     private statusDao: StandupStatusDao;
 
     private viewBuilder = new BotViewBuilder();
+
+    private userInfoCache : Map<string, UserInfo> = new Map();
 
     constructor(statusDao: StandupStatusDao) {
         this.statusDao = statusDao;
@@ -137,6 +140,7 @@ export class SlackBot {
             dateStr = view['state']['values']['schedule-date'][ACTION_NAMES.get("SCHEDULE_DATE")!]['selected_date'];
             timeStr = view['state']['values']['schedule-time'][ACTION_NAMES.get("SCHEDULE_TIME")!]['selected_time'];
             // Timezone is not available in the ViewStateValue interface
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             tz = view['state']['values']['schedule-time'][ACTION_NAMES.get("SCHEDULE_TIME")!]['timezone'];
             // Convert to the correct UTC time based on passed timezone
@@ -287,17 +291,30 @@ export class SlackBot {
         return await Promise.all(memberInfosProm!);
     }
 
+    /**
+     * Query Slack API for the user, but first check the cache.
+     * 
+     * @param user 
+     * @param client 
+     * @returns 
+     */
     private async queryUser(user: string, client: WebClient): Promise<UserInfo> {
+        if (this.userInfoCache.has(user)){
+            logger.debug("Cache hit for user", user);
+            return this.userInfoCache.get(user)!;
+        }
         const resp = await client.users.info({
             user: user
         });
 
-        return {
+        const userInfo = {
             name: resp.user?.real_name!,
             userId: user,
             img: resp.user?.profile?.image_72,
             timezone: resp.user?.tz!
         }
+        this.userInfoCache.set(user, userInfo);
+        return userInfo
     }
 
     /**
