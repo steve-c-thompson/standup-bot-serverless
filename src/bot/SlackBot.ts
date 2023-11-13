@@ -26,7 +26,11 @@ export class SlackBot {
 
     private viewBuilder = new BotViewBuilder();
 
+    // Cache of UserInfo objects stored by Slack userId
     private userInfoCache : Map<string, UserInfo> = new Map();
+
+    // Set of channel Ids in which the bot has been installed
+    private channelsInstalled : Set<string> = new Set();
 
     constructor(statusDao: StandupStatusDao) {
         this.statusDao = statusDao;
@@ -501,6 +505,10 @@ export class SlackBot {
      * @param client
      */
     async validateBotUserInChannel(channelId: string, botId: string, client: WebClient): Promise<boolean> {
+        if (this.channelsInstalled.has(channelId)) {
+            return true;
+        }
+
         const channelData = await client.conversations.members({
             channel: channelId,
         });
@@ -509,9 +517,14 @@ export class SlackBot {
             bot: botId
         })
         const botUserId = botData.bot?.user_id;
-        return !!channelData.members?.find(m => {
+        const result = !!channelData.members?.find(m => {
             return m === botUserId;
         });
+        if(result) {
+            // store in the cache
+            this.channelsInstalled.add(channelId);
+        }
+        return result;
     }
 
     public async getUserTimezone(userId: string, client: WebClient): Promise<string> {
