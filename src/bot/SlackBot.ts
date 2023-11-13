@@ -301,7 +301,7 @@ export class SlackBot {
     private async queryUser(user: string, client: WebClient): Promise<UserInfo> {
         if (this.userInfoCache.has(user)){
             logger.debug("Cache hit for user", user);
-            return this.userInfoCache.get(user)!;
+            return Promise.resolve(this.userInfoCache.get(user)!);
         }
         const resp = await client.users.info({
             user: user
