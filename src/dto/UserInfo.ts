@@ -3,4 +3,5 @@ export class UserInfo {
     userId: string
     img?: string
     timezone: string
+    tzOffset: number
 }
