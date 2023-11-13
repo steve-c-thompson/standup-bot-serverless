@@ -298,13 +298,6 @@ export class SlackBot {
      * @param client 
      * @returns 
      */
-    /**
-     * Query Slack API for the user, but first check the cache.
-     * 
-     * @param user 
-     * @param client 
-     * @returns 
-     */
     private async queryUser(user: string, client: WebClient): Promise<UserInfo> {
         if (this.userInfoCache.has(user)){
             logger.debug("Cache hit for user", user);
